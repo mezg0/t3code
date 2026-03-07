@@ -18,6 +18,25 @@ import {
   type ProviderTurnStartResult,
   type ProviderUserInputAnswers,
 } from "@t3tools/contracts";
+import type {
+  Event as OpenCodeEvent,
+  EventMessagePartDelta,
+  EventMessagePartUpdated,
+  EventPermissionAsked,
+  EventPermissionReplied,
+  EventQuestionAsked,
+  EventQuestionReplied,
+  EventQuestionRejected,
+  EventSessionError,
+  EventSessionStatus,
+  EventTodoUpdated,
+  OpencodeClient as OpenCodeSdkClient,
+  OpencodeClientConfig,
+  QuestionInfo,
+  Todo as OpenCodeTodo,
+  ToolPart as OpenCodeToolPart,
+  ToolState as OpenCodeToolState,
+} from "@opencode-ai/sdk/v2/client";
 import type { ProviderThreadSnapshot } from "./provider/Services/ProviderAdapter.ts";
 
 const PROVIDER = "opencode" as const;
@@ -29,12 +48,13 @@ const SERVER_PROBE_TIMEOUT_MS = 1500;
 type OpenCodeProviderOptions = NonNullable<
   NonNullable<ProviderSessionStartInput["providerOptions"]>["opencode"]
 >;
-type OpencodeClient = ReturnType<typeof import("@opencode-ai/sdk/v2/client").createOpencodeClient>;
+type OpencodeClient = OpenCodeSdkClient;
+type OpencodeClientOptions = OpencodeClientConfig & {
+  directory?: string;
+};
 type OpenCodeModelDiscoveryOptions = OpenCodeProviderOptions & {
   directory?: string;
 };
-
-type OpencodeEvent = Record<string, unknown>;
 
 interface OpenCodeManagerEvents {
   event: [ProviderRuntimeEvent];
@@ -61,7 +81,8 @@ interface PendingQuestionRequest {
 }
 
 interface PartStreamState {
-  readonly streamKind: "assistant_text" | "reasoning_text";
+  readonly kind: "text" | "reasoning" | "tool";
+  readonly streamKind?: "assistant_text" | "reasoning_text";
 }
 
 interface OpenCodeSessionContext {
@@ -248,6 +269,105 @@ function textPart(text: string) {
     type: "text" as const,
     text,
   };
+}
+
+function readMetadataString(
+  metadata: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  const value = metadata?.[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function sessionErrorMessage(error: EventSessionError["properties"]["error"]): string | undefined {
+  if (!error) {
+    return undefined;
+  }
+
+  switch (error.name) {
+    case "ProviderAuthError":
+    case "UnknownError":
+    case "MessageAbortedError":
+    case "StructuredOutputError":
+    case "ContextOverflowError":
+    case "APIError":
+      return error.data.message;
+    case "MessageOutputLengthError":
+      return "OpenCode response exceeded output length";
+  }
+}
+
+function toolStateTitle(state: OpenCodeToolState): string | undefined {
+  switch (state.status) {
+    case "pending":
+      return undefined;
+    case "running":
+    case "completed":
+      return state.title;
+    case "error":
+      return readMetadataString(state.metadata, "title");
+  }
+}
+
+function toolStateDetail(state: OpenCodeToolState): string | undefined {
+  switch (state.status) {
+    case "pending":
+      return undefined;
+    case "running":
+      return readMetadataString(state.metadata, "summary") ?? state.title;
+    case "completed":
+      return readMetadataString(state.metadata, "summary") ?? state.output;
+    case "error":
+      return state.error;
+  }
+}
+
+function toPlanStepStatus(status: OpenCodeTodo["status"]): "pending" | "inProgress" | "completed" {
+  switch (status) {
+    case "completed":
+      return "completed";
+    case "in_progress":
+      return "inProgress";
+    default:
+      return "pending";
+  }
+}
+
+function toToolItemType(toolName: string | undefined):
+  | "command_execution"
+  | "file_change"
+  | "web_search"
+  | "collab_agent_tool_call"
+  | "dynamic_tool_call" {
+  switch (toolName) {
+    case "bash":
+      return "command_execution";
+    case "write":
+    case "edit":
+    case "apply_patch":
+      return "file_change";
+    case "webfetch":
+      return "web_search";
+    case "task":
+      return "collab_agent_tool_call";
+    default:
+      return "dynamic_tool_call";
+  }
+}
+
+function toToolTitle(toolName: string | undefined): string {
+  const value = asString(toolName) ?? "tool";
+  return value.slice(0, 1).toUpperCase() + value.slice(1);
+}
+
+function toToolLifecycleEventType(
+  previous: PartStreamState | undefined,
+  status: OpenCodeToolState["status"],
+): "item.started" | "item.updated" | "item.completed" {
+  if (status === "completed" || status === "error") {
+    return "item.completed";
+  }
+  return previous?.kind === "tool" ? "item.updated" : "item.started";
 }
 
 async function readJsonData<T>(promise: Promise<T>): Promise<T> {
@@ -772,9 +892,9 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
     }
   }
 
-  private async createClient(options: Record<string, unknown>): Promise<OpencodeClient> {
+  private async createClient(options: OpencodeClientOptions): Promise<OpencodeClient> {
     const sdk = await import("@opencode-ai/sdk/v2/client");
-    return sdk.createOpencodeClient(options) as unknown as OpencodeClient;
+    return sdk.createOpencodeClient(options);
   }
 
   private async startStream(context: OpenCodeSessionContext): Promise<void> {
@@ -790,7 +910,7 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
         if (context.streamAbortController.signal.aborted) {
           break;
         }
-        this.handleEvent(context, asRecord(event));
+        this.handleEvent(context, event);
       }
     } catch (cause) {
       if (context.streamAbortController.signal.aborted) {
@@ -819,66 +939,47 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
     }
   }
 
-  private handleEvent(context: OpenCodeSessionContext, event: OpencodeEvent | undefined): void {
-    if (!event) {
-      return;
-    }
-    const type = asString(event.type);
-    if (!type) {
-      return;
-    }
-    const props = asRecord(event.properties);
-    const data = props
-      ? {
-          type,
-          ...props,
-        }
-      : event;
-
-    switch (type) {
+  private handleEvent(context: OpenCodeSessionContext, event: OpenCodeEvent): void {
+    switch (event.type) {
       case "session.status":
-        this.handleSessionStatusEvent(context, data);
+        this.handleSessionStatusEvent(context, event);
         return;
       case "session.error":
-        this.handleSessionErrorEvent(context, data);
+        this.handleSessionErrorEvent(context, event);
         return;
       case "permission.asked":
-        this.handlePermissionAskedEvent(context, data);
+        this.handlePermissionAskedEvent(context, event);
         return;
       case "permission.replied":
-        this.handlePermissionRepliedEvent(context, data);
+        this.handlePermissionRepliedEvent(context, event);
         return;
       case "question.asked":
-        this.handleQuestionAskedEvent(context, data);
+        this.handleQuestionAskedEvent(context, event);
         return;
       case "question.replied":
-        this.handleQuestionRepliedEvent(context, data);
+        this.handleQuestionRepliedEvent(context, event);
         return;
       case "question.rejected":
-        this.handleQuestionRejectedEvent(context, data);
+        this.handleQuestionRejectedEvent(context, event);
         return;
       case "message.part.updated":
-        this.handleMessagePartUpdatedEvent(context, data);
+        this.handleMessagePartUpdatedEvent(context, event);
         return;
       case "message.part.delta":
-        this.handleMessagePartDeltaEvent(context, data);
+        this.handleMessagePartDeltaEvent(context, event);
         return;
       case "todo.updated":
-        this.handleTodoUpdatedEvent(context, data);
+        this.handleTodoUpdatedEvent(context, event);
         return;
     }
   }
 
-  private handleSessionStatusEvent(context: OpenCodeSessionContext, event: OpencodeEvent): void {
-    const sessionId = asString(event.sessionID);
+  private handleSessionStatusEvent(context: OpenCodeSessionContext, event: EventSessionStatus): void {
+    const { sessionID: sessionId, status } = event.properties;
     if (sessionId !== context.providerSessionId) {
       return;
     }
-    const status = asRecord(event.status);
-    const statusType = asString(status?.type);
-    if (!statusType) {
-      return;
-    }
+    const statusType = status.type;
 
     if (statusType === "busy") {
       context.session = {
@@ -981,15 +1082,12 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
     }
   }
 
-  private handleSessionErrorEvent(context: OpenCodeSessionContext, event: OpencodeEvent): void {
-    const sessionId = asString(event.sessionID);
+  private handleSessionErrorEvent(context: OpenCodeSessionContext, event: EventSessionError): void {
+    const { sessionID: sessionId, error } = event.properties;
     if (sessionId && sessionId !== context.providerSessionId) {
       return;
     }
-    const errorMessage =
-      asString(asRecord(event.error)?.message) ??
-      asString(event.message) ??
-      "OpenCode session error";
+    const errorMessage = sessionErrorMessage(error) ?? "OpenCode session error";
     context.lastError = errorMessage;
     context.session = {
       ...stripTransientSessionFields(context.session),
@@ -1016,13 +1114,11 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
     });
   }
 
-  private handlePermissionAskedEvent(context: OpenCodeSessionContext, event: OpencodeEvent): void {
-    const requestIdValue = asString(event.id);
-    const sessionId = asString(event.sessionID);
-    if (!requestIdValue || sessionId !== context.providerSessionId) {
+  private handlePermissionAskedEvent(context: OpenCodeSessionContext, event: EventPermissionAsked): void {
+    const { id: requestIdValue, sessionID: sessionId, permission } = event.properties;
+    if (sessionId !== context.providerSessionId) {
       return;
     }
-    const permission = asString(event.permission);
     const requestType = toOpencodeRequestType(permission);
     const requestId = ApprovalRequestId.makeUnsafe(requestIdValue);
     context.pendingPermissions.set(requestId, { requestId, requestType });
@@ -1036,8 +1132,8 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
       requestId: RuntimeRequestId.makeUnsafe(requestId),
       payload: {
         requestType,
-        ...(permission ? { detail: permission } : {}),
-        args: event,
+          detail: permission,
+          args: event.properties,
       },
       raw: {
         source: "opencode.server.permission",
@@ -1049,11 +1145,10 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
 
   private handlePermissionRepliedEvent(
     context: OpenCodeSessionContext,
-    event: OpencodeEvent,
+    event: EventPermissionReplied,
   ): void {
-    const requestIdValue = asString(event.requestID);
-    const sessionId = asString(event.sessionID);
-    if (!requestIdValue || sessionId !== context.providerSessionId) {
+    const { requestID: requestIdValue, sessionID: sessionId, reply } = event.properties;
+    if (sessionId !== context.providerSessionId) {
       return;
     }
     const pending = context.pendingPermissions.get(requestIdValue);
@@ -1068,8 +1163,8 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
       requestId: RuntimeRequestId.makeUnsafe(requestIdValue),
       payload: {
         requestType: pending?.requestType ?? "unknown",
-        ...(asString(event.reply) ? { decision: asString(event.reply) } : {}),
-        resolution: event,
+        decision: reply,
+        resolution: event.properties,
       },
       raw: {
         source: "opencode.server.permission",
@@ -1079,38 +1174,21 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
     });
   }
 
-  private handleQuestionAskedEvent(context: OpenCodeSessionContext, event: OpencodeEvent): void {
-    const requestIdValue = asString(event.id);
-    const sessionId = asString(event.sessionID);
-    if (!requestIdValue || sessionId !== context.providerSessionId) {
+  private handleQuestionAskedEvent(context: OpenCodeSessionContext, event: EventQuestionAsked): void {
+    const { id: requestIdValue, sessionID: sessionId, questions: askedQuestions } = event.properties;
+    if (sessionId !== context.providerSessionId) {
       return;
     }
-    const questions = (asArray(event.questions) ?? []).flatMap((entry, index) => {
-      const question = asRecord(entry);
-      const header = asString(question?.header);
-      const prompt = asString(question?.question);
-      if (!header || !prompt) {
-        return [];
-      }
-      const options = (asArray(question?.options) ?? []).flatMap((option) => {
-        const record = asRecord(option);
-        const label = asString(record?.label);
-        const description = asString(record?.description);
-        if (!label || !description) {
-          return [];
-        }
-        return [{ label, description }];
-      });
-      return [
-        {
-          answerIndex: index,
-          id: `${requestIdValue}:${index}`,
-          header,
-          question: prompt,
-          options,
-        },
-      ];
-    });
+    const questions = askedQuestions.map((question: QuestionInfo, index) => ({
+      answerIndex: index,
+      id: `${requestIdValue}:${index}`,
+      header: question.header,
+      question: question.question,
+      options: question.options.map((option) => ({
+        label: option.label,
+        description: option.description,
+      })),
+    }));
     const runtimeQuestions = questions.map((question) => ({
       id: question.id,
       header: question.header,
@@ -1143,25 +1221,23 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
     });
   }
 
-  private handleQuestionRepliedEvent(context: OpenCodeSessionContext, event: OpencodeEvent): void {
-    const requestIdValue = asString(event.requestID);
-    const sessionId = asString(event.sessionID);
-    if (!requestIdValue || sessionId !== context.providerSessionId) {
+  private handleQuestionRepliedEvent(
+    context: OpenCodeSessionContext,
+    event: EventQuestionReplied,
+  ): void {
+    const { requestID: requestIdValue, sessionID: sessionId, answers: answerArrays } = event.properties;
+    if (sessionId !== context.providerSessionId) {
       return;
     }
     const pending = context.pendingQuestions.get(requestIdValue);
     context.pendingQuestions.delete(requestIdValue);
-    const answerArrays = asArray(event.answers) ?? [];
     const answers = Object.fromEntries(
       (pending?.questions ?? []).map((question) => {
-        const answer = asArray(answerArrays[question.answerIndex]);
+        const answer = answerArrays[question.answerIndex];
         if (!answer) {
           return [question.id, ""];
         }
-        return [
-          question.id,
-          answer.map((value) => String(value)).filter((value) => value.length > 0),
-        ];
+        return [question.id, answer.filter((value) => value.length > 0)];
       }),
     );
     this.emitRuntimeEvent({
@@ -1183,10 +1259,12 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
     });
   }
 
-  private handleQuestionRejectedEvent(context: OpenCodeSessionContext, event: OpencodeEvent): void {
-    const requestIdValue = asString(event.requestID);
-    const sessionId = asString(event.sessionID);
-    if (!requestIdValue || sessionId !== context.providerSessionId) {
+  private handleQuestionRejectedEvent(
+    context: OpenCodeSessionContext,
+    event: EventQuestionRejected,
+  ): void {
+    const { requestID: requestIdValue, sessionID: sessionId } = event.properties;
+    if (sessionId !== context.providerSessionId) {
       return;
     }
     context.pendingQuestions.delete(requestIdValue);
@@ -1211,65 +1289,102 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
 
   private handleMessagePartUpdatedEvent(
     context: OpenCodeSessionContext,
-    event: OpencodeEvent,
+    event: EventMessagePartUpdated,
   ): void {
-    const part = asRecord(event.part);
-    const sessionId = asString(event.sessionID) ?? asString(part?.sessionID);
-    if (sessionId !== context.providerSessionId) {
+    const { part } = event.properties;
+    if (part.sessionID !== context.providerSessionId) {
       return;
     }
-    const partId = asString(part?.id);
-    const partType = asString(part?.type);
-    if (!partId || !partType) {
+    if (part.type === "text") {
+      context.partStreamById.set(part.id, { kind: "text", streamKind: "assistant_text" });
       return;
     }
-    if (partType === "text") {
-      context.partStreamById.set(partId, { streamKind: "assistant_text" });
-      return;
-    }
-    if (partType === "reasoning") {
-      context.partStreamById.set(partId, { streamKind: "reasoning_text" });
+    if (part.type === "reasoning") {
+      context.partStreamById.set(part.id, { kind: "reasoning", streamKind: "reasoning_text" });
       return;
     }
 
-    if (partType === "tool") {
-      const state = asRecord(part?.state);
-      const toolName = asString(part?.tool) ?? "tool";
-      const summary = asString(asRecord(state?.metadata)?.title) ?? asString(state?.title);
-      const status = asString(state?.status);
-      if ((status === "completed" || status === "error") && summary) {
-        this.emitRuntimeEvent({
-          type: "tool.summary",
-          eventId: eventId("opencode-tool-summary"),
-          provider: PROVIDER,
-          threadId: context.threadId,
-          createdAt: nowIso(),
-          ...(context.activeTurnId ? { turnId: context.activeTurnId } : {}),
-          itemId: RuntimeItemId.makeUnsafe(partId),
-          payload: {
-            summary: `${toolName}: ${summary}`,
-            precedingToolUseIds: [partId],
-          },
-          raw: {
-            source: "opencode.server.event",
-            messageType: "message.part.updated",
-            payload: event,
-          },
-        });
-      }
+    if (part.type === "tool") {
+      this.handleToolPartUpdatedEvent(context, event, part);
     }
   }
 
-  private handleMessagePartDeltaEvent(context: OpenCodeSessionContext, event: OpencodeEvent): void {
-    if (asString(event.sessionID) !== context.providerSessionId) {
+  private handleToolPartUpdatedEvent(
+    context: OpenCodeSessionContext,
+    event: EventMessagePartUpdated,
+    part: OpenCodeToolPart,
+  ): void {
+    const previous = context.partStreamById.get(part.id);
+    const title = toolStateTitle(part.state);
+    const detail = toolStateDetail(part.state);
+    const lifecycleType = toToolLifecycleEventType(previous, part.state.status);
+
+    context.partStreamById.set(part.id, { kind: "tool" });
+    this.emitRuntimeEvent({
+      type: lifecycleType,
+      eventId: eventId(`opencode-tool-${lifecycleType.replace('.', '-')}`),
+      provider: PROVIDER,
+      threadId: context.threadId,
+      createdAt: nowIso(),
+      ...(context.activeTurnId ? { turnId: context.activeTurnId } : {}),
+      itemId: RuntimeItemId.makeUnsafe(part.id),
+      payload: {
+        itemType: toToolItemType(part.tool),
+        ...(lifecycleType !== "item.updated"
+          ? {
+              status: lifecycleType === "item.completed" ? "completed" : "inProgress",
+            }
+          : {}),
+        title: toToolTitle(part.tool),
+        ...(detail ? { detail } : {}),
+        data: {
+          item: part,
+        },
+      },
+      raw: {
+        source: "opencode.server.event",
+        messageType: "message.part.updated",
+        payload: event,
+      },
+    });
+
+    if ((part.state.status === "completed" || part.state.status === "error") && title) {
+      this.emitRuntimeEvent({
+        type: "tool.summary",
+        eventId: eventId("opencode-tool-summary"),
+        provider: PROVIDER,
+        threadId: context.threadId,
+        createdAt: nowIso(),
+        ...(context.activeTurnId ? { turnId: context.activeTurnId } : {}),
+        itemId: RuntimeItemId.makeUnsafe(part.id),
+        payload: {
+          summary: `${part.tool}: ${title}`,
+          precedingToolUseIds: [part.id],
+        },
+        raw: {
+          source: "opencode.server.event",
+          messageType: "message.part.updated",
+          payload: event,
+        },
+      });
+    }
+  }
+
+  private handleMessagePartDeltaEvent(
+    context: OpenCodeSessionContext,
+    event: EventMessagePartDelta,
+  ): void {
+    const { sessionID, partID: partId, delta } = event.properties;
+    if (sessionID !== context.providerSessionId) {
       return;
     }
-    const partId = asString(event.partID);
-    const delta = asString(event.delta);
-    if (!partId || !delta || !context.activeTurnId) {
+    if (!context.activeTurnId || delta.length === 0) {
       return;
     }
     const partState = context.partStreamById.get(partId);
+    if (partState?.kind === "tool") {
+      return;
+    }
     this.emitRuntimeEvent({
       type: "content.delta",
       eventId: eventId("opencode-content-delta"),
@@ -1290,30 +1405,15 @@ export class OpenCodeServerManager extends EventEmitter<OpenCodeManagerEvents> {
     });
   }
 
-  private handleTodoUpdatedEvent(context: OpenCodeSessionContext, event: OpencodeEvent): void {
-    if (asString(event.sessionID) !== context.providerSessionId || !context.activeTurnId) {
+  private handleTodoUpdatedEvent(context: OpenCodeSessionContext, event: EventTodoUpdated): void {
+    const { sessionID, todos } = event.properties;
+    if (sessionID !== context.providerSessionId || !context.activeTurnId) {
       return;
     }
-    const todos = asArray(event.todos) ?? [];
-    const plan = todos.flatMap((entry) => {
-      const todo = asRecord(entry);
-      const step = asString(todo?.content);
-      const status = asString(todo?.status);
-      if (!step || !status) {
-        return [];
-      }
-      return [
-        {
-          step,
-          status:
-            status === "completed"
-              ? "completed"
-              : status === "in_progress"
-                ? "inProgress"
-                : "pending",
-        } as const,
-      ];
-    });
+    const plan = todos.map((todo) => ({
+      step: todo.content,
+      status: toPlanStepStatus(todo.status),
+    }));
     this.emitRuntimeEvent({
       type: "turn.plan.updated",
       eventId: eventId("opencode-plan-updated"),

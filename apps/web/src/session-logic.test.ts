@@ -479,6 +479,55 @@ describe("deriveWorkLogEntries", () => {
       "apps/web/src/session-logic.ts",
     ]);
   });
+
+  it("collapses repeated tool lifecycle updates for the same tool item", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "tool-update-1",
+        createdAt: "2026-02-23T00:00:01.000Z",
+        kind: "tool.updated",
+        summary: "Bash",
+        payload: {
+          itemId: "tool-part-1",
+          data: {
+            item: {
+              id: "tool-part-1",
+              callID: "call-1",
+            },
+          },
+        },
+      }),
+      makeActivity({
+        id: "tool-update-2",
+        createdAt: "2026-02-23T00:00:02.000Z",
+        kind: "tool.updated",
+        summary: "Bash",
+        payload: {
+          itemId: "tool-part-1",
+          data: {
+            item: {
+              id: "tool-part-1",
+              callID: "call-1",
+            },
+          },
+        },
+      }),
+      makeActivity({
+        id: "tool-complete",
+        createdAt: "2026-02-23T00:00:03.000Z",
+        kind: "tool.completed",
+        summary: "Bash complete",
+        payload: {
+          itemId: "tool-part-1",
+        },
+      }),
+    ];
+
+    const entries = deriveWorkLogEntries(activities, undefined);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.id).toBe("tool-complete");
+    expect(entries[0]?.label).toBe("Bash complete");
+  });
 });
 
 describe("deriveTimelineEntries", () => {

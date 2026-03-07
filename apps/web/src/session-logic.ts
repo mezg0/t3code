@@ -412,12 +412,16 @@ export function deriveWorkLogEntries(
   latestTurnId: TurnId | undefined,
 ): WorkLogEntry[] {
   const ordered = [...activities].toSorted(compareActivitiesByOrder);
-  return ordered
+  const filtered = ordered
     .filter((activity) => (latestTurnId ? activity.turnId === latestTurnId : true))
     .filter((activity) => activity.kind !== "tool.started")
     .filter((activity) => activity.kind !== "task.started" && activity.kind !== "task.completed")
-    .filter((activity) => activity.summary !== "Checkpoint captured")
-    .map((activity) => {
+    .filter((activity) => activity.summary !== "Checkpoint captured");
+
+  const entries: WorkLogEntry[] = [];
+  const toolEntryIndexByIdentity = new Map<string, number>();
+
+  for (const activity of filtered) {
       const payload =
         activity.payload && typeof activity.payload === "object"
           ? (activity.payload as Record<string, unknown>)
@@ -439,8 +443,21 @@ export function deriveWorkLogEntries(
       if (changedFiles.length > 0) {
         entry.changedFiles = changedFiles;
       }
-      return entry;
-    });
+
+      const toolIdentity = activity.tone === "tool" ? extractToolIdentity(payload) : null;
+      if (toolIdentity) {
+        const existingIndex = toolEntryIndexByIdentity.get(toolIdentity);
+        if (existingIndex !== undefined) {
+          entries[existingIndex] = entry;
+          continue;
+        }
+        toolEntryIndexByIdentity.set(toolIdentity, entries.length);
+      }
+
+      entries.push(entry);
+    }
+
+  return entries;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -479,6 +496,18 @@ function extractToolCommand(payload: Record<string, unknown> | null): string | n
     normalizeCommandValue(itemInput?.command),
     normalizeCommandValue(itemResult?.command),
     normalizeCommandValue(data?.command),
+  ];
+  return candidates.find((candidate) => candidate !== null) ?? null;
+}
+
+function extractToolIdentity(payload: Record<string, unknown> | null): string | null {
+  const data = asRecord(payload?.data);
+  const item = asRecord(data?.item);
+  const candidates = [
+    asTrimmedString(payload?.itemId),
+    asTrimmedString(item?.id),
+    asTrimmedString(item?.callID),
+    asTrimmedString(data?.itemId),
   ];
   return candidates.find((candidate) => candidate !== null) ?? null;
 }
