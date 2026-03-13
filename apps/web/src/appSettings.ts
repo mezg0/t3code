@@ -12,6 +12,7 @@ export type TimestampFormat = (typeof TIMESTAMP_FORMAT_OPTIONS)[number];
 export const DEFAULT_TIMESTAMP_FORMAT: TimestampFormat = "locale";
 const BUILT_IN_MODEL_SLUGS_BY_PROVIDER: Record<ProviderKind, ReadonlySet<string>> = {
   codex: new Set(getModelOptions("codex").map((option) => option.slug)),
+  opencode: new Set(getModelOptions("opencode").map((option) => option.slug)),
 };
 
 const AppSettingsSchema = Schema.Struct({
@@ -32,6 +33,10 @@ const AppSettingsSchema = Schema.Struct({
     Schema.withConstructorDefault(() => Option.some(DEFAULT_TIMESTAMP_FORMAT)),
   ),
   customCodexModels: Schema.Array(Schema.String).pipe(
+    Schema.withConstructorDefault(() => Option.some([])),
+  ),
+  customOpencodeModels: Schema.Array(Schema.String).pipe(
+    Schema.withDecodingDefault(() => []),
     Schema.withConstructorDefault(() => Option.some([])),
   ),
 });
@@ -73,12 +78,21 @@ export function normalizeCustomModelSlugs(
   return normalizedModels;
 }
 
+function normalizeAppSettings(settings: AppSettings): AppSettings {
+  return {
+    ...settings,
+    customCodexModels: normalizeCustomModelSlugs(settings.customCodexModels, "codex"),
+    customOpencodeModels: normalizeCustomModelSlugs(settings.customOpencodeModels, "opencode"),
+  };
+}
+
 export function getAppModelOptions(
   provider: ProviderKind,
   customModels: readonly string[],
   selectedModel?: string | null,
+  builtInModels: ReadonlyArray<{ slug: string; name: string }> = getModelOptions(provider),
 ): AppModelOption[] {
-  const options: AppModelOption[] = getModelOptions(provider).map(({ slug, name }) => ({
+  const options: AppModelOption[] = builtInModels.map(({ slug, name }) => ({
     slug,
     name,
     isCustom: false,
@@ -114,8 +128,9 @@ export function resolveAppModelSelection(
   provider: ProviderKind,
   customModels: readonly string[],
   selectedModel: string | null | undefined,
+  builtInModels: ReadonlyArray<{ slug: string; name: string }> = getModelOptions(provider),
 ): string {
-  const options = getAppModelOptions(provider, customModels, selectedModel);
+  const options = getAppModelOptions(provider, customModels, selectedModel, builtInModels);
   const trimmedSelectedModel = selectedModel?.trim();
   if (trimmedSelectedModel) {
     const direct = options.find((option) => option.slug === trimmedSelectedModel);
@@ -142,6 +157,25 @@ export function resolveAppModelSelection(
   );
 }
 
+export function getSlashModelOptions(
+  provider: ProviderKind,
+  customModels: readonly string[],
+  query: string,
+  selectedModel?: string | null,
+  builtInModels: ReadonlyArray<{ slug: string; name: string }> = getModelOptions(provider),
+): AppModelOption[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  const options = getAppModelOptions(provider, customModels, selectedModel, builtInModels);
+  if (!normalizedQuery) {
+    return options;
+  }
+
+  return options.filter((option) => {
+    const searchSlug = option.slug.toLowerCase();
+    const searchName = option.name.toLowerCase();
+    return searchSlug.includes(normalizedQuery) || searchName.includes(normalizedQuery);
+  });
+}
 export function useAppSettings() {
   const [settings, setSettings] = useLocalStorage(
     APP_SETTINGS_STORAGE_KEY,
@@ -151,10 +185,7 @@ export function useAppSettings() {
 
   const updateSettings = useCallback(
     (patch: Partial<AppSettings>) => {
-      setSettings((prev) => ({
-        ...prev,
-        ...patch,
-      }));
+      setSettings((prev) => normalizeAppSettings({ ...prev, ...patch }));
     },
     [setSettings],
   );

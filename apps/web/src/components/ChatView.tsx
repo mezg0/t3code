@@ -1,10 +1,13 @@
 import {
+  CODEX_REASONING_EFFORT_OPTIONS,
+  OPENCODE_REASONING_EFFORT_OPTIONS,
   type ApprovalRequestId,
+  type CodexReasoningEffort,
   DEFAULT_MODEL_BY_PROVIDER,
   type EditorId,
   type KeybindingCommand,
-  type CodexReasoningEffort,
   type MessageId,
+  type OpenCodeReasoningEffort,
   type ProjectId,
   type ProjectEntry,
   type ProjectScript,
@@ -20,6 +23,7 @@ import {
   OrchestrationThreadActivity,
   RuntimeMode,
   ProviderInteractionMode,
+  type ReasoningEffort,
 } from "@t3tools/contracts";
 import {
   getDefaultModel,
@@ -148,6 +152,7 @@ import {
   buildLocalDraftThread,
   buildTemporaryWorktreeBranchName,
   cloneComposerImageForRetry,
+  getCustomModelsForProvider,
   collectUserMessageBlobPreviewUrls,
   getCustomModelOptionsByProvider,
   LAST_INVOKED_SCRIPT_BY_PROJECT_KEY,
@@ -173,6 +178,33 @@ const EMPTY_PENDING_USER_INPUT_ANSWERS: Record<string, PendingUserInputDraftAnsw
 const COMPOSER_PATH_QUERY_DEBOUNCE_MS = 120;
 const SCRIPT_TERMINAL_COLS = 120;
 const SCRIPT_TERMINAL_ROWS = 30;
+
+function isCodexReasoningEffort(value: ReasoningEffort | null): value is CodexReasoningEffort {
+  return value !== null && CODEX_REASONING_EFFORT_OPTIONS.includes(value as CodexReasoningEffort);
+}
+
+function isOpenCodeReasoningEffort(
+  value: ReasoningEffort | null,
+): value is OpenCodeReasoningEffort {
+  return (
+    value !== null && OPENCODE_REASONING_EFFORT_OPTIONS.includes(value as OpenCodeReasoningEffort)
+  );
+}
+
+function getOpenCodeReasoningOptions(
+  providerStatuses: ReadonlyArray<ServerProviderStatus>,
+  selectedModel: string,
+): ReadonlyArray<OpenCodeReasoningEffort> {
+  const model = providerStatuses
+    .find((status) => status.provider === "opencode")
+    ?.models?.find((entry) => entry.slug === selectedModel);
+  if (!model?.variants || model.variants.length === 0) {
+    return OPENCODE_REASONING_EFFORT_OPTIONS;
+  }
+  return model.variants.filter((variant): variant is OpenCodeReasoningEffort =>
+    OPENCODE_REASONING_EFFORT_OPTIONS.includes(variant as OpenCodeReasoningEffort),
+  );
+}
 
 const extendReplacementRangeForTrailingSpace = (
   text: string,
@@ -384,6 +416,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
   const activeLatestTurn = activeThread?.latestTurn ?? null;
   const latestTurnSettled = isLatestTurnSettled(activeLatestTurn, activeThread?.session ?? null);
   const activeProject = projects.find((p) => p.id === activeThread?.projectId);
+  const serverConfigQuery = useQuery(serverConfigQueryOptions());
 
   const openPullRequestDialog = useCallback(
     (reference?: string) => {
@@ -474,7 +507,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
     const lastVisitedAt = activeThread.lastVisitedAt ? Date.parse(activeThread.lastVisitedAt) : NaN;
     if (!Number.isNaN(lastVisitedAt) && lastVisitedAt >= turnCompletedAt) return;
 
-    markThreadVisited(activeThread.id);
+    markThreadVisited(activeThread.id, activeLatestTurn.completedAt);
   }, [
     activeThread?.id,
     activeThread?.lastVisitedAt,
@@ -499,7 +532,16 @@ export default function ChatView({ threadId }: ChatViewProps) {
     selectedProvider,
     activeThread?.model ?? activeProject?.model ?? getDefaultModel(selectedProvider),
   );
-  const customModelsForSelectedProvider = settings.customCodexModels;
+  const modelOptionsByProvider = useMemo(
+    () =>
+      getCustomModelOptionsByProvider(
+        settings,
+        serverConfigQuery.data?.providers ?? EMPTY_PROVIDER_STATUSES,
+      ),
+    [serverConfigQuery.data?.providers, settings],
+  );
+  const customModelsForSelectedProvider = getCustomModelsForProvider(settings, selectedProvider);
+  const builtInModelsForSelectedProvider = modelOptionsByProvider[selectedProvider];
   const selectedModel = useMemo(() => {
     const draftModel = composerDraft.model;
     if (!draftModel) {
@@ -509,45 +551,73 @@ export default function ChatView({ threadId }: ChatViewProps) {
       selectedProvider,
       customModelsForSelectedProvider,
       draftModel,
+      builtInModelsForSelectedProvider,
     ) as ModelSlug;
-  }, [baseThreadModel, composerDraft.model, customModelsForSelectedProvider, selectedProvider]);
-  const reasoningOptions = getReasoningEffortOptions(selectedProvider);
-  const supportsReasoningEffort = reasoningOptions.length > 0;
-  const selectedEffort = composerDraft.effort ?? getDefaultReasoningEffort(selectedProvider);
-  const selectedCodexFastModeEnabled =
-    selectedProvider === "codex" ? composerDraft.codexFastMode : false;
-  const selectedModelOptionsForDispatch = useMemo(() => {
-    if (selectedProvider !== "codex") {
-      return undefined;
-    }
-    const codexOptions = {
-      ...(supportsReasoningEffort && selectedEffort ? { reasoningEffort: selectedEffort } : {}),
-      ...(selectedCodexFastModeEnabled ? { fastMode: true } : {}),
-    };
-    return Object.keys(codexOptions).length > 0 ? { codex: codexOptions } : undefined;
-  }, [selectedCodexFastModeEnabled, selectedEffort, selectedProvider, supportsReasoningEffort]);
-  const providerOptionsForDispatch = useMemo(() => {
-    if (!settings.codexBinaryPath && !settings.codexHomePath) {
-      return undefined;
-    }
-    return {
-      codex: {
-        ...(settings.codexBinaryPath ? { binaryPath: settings.codexBinaryPath } : {}),
-        ...(settings.codexHomePath ? { homePath: settings.codexHomePath } : {}),
-      },
-    };
-  }, [settings.codexBinaryPath, settings.codexHomePath]);
+  }, [
+    baseThreadModel,
+    builtInModelsForSelectedProvider,
+    composerDraft.model,
+    customModelsForSelectedProvider,
+    selectedProvider,
+  ]);
   const selectedModelForPicker = selectedModel;
-  const modelOptionsByProvider = useMemo(
-    () => getCustomModelOptionsByProvider(settings),
-    [settings],
-  );
   const selectedModelForPickerWithCustomFallback = useMemo(() => {
     const currentOptions = modelOptionsByProvider[selectedProvider];
     return currentOptions.some((option) => option.slug === selectedModelForPicker)
       ? selectedModelForPicker
       : (normalizeModelSlug(selectedModelForPicker, selectedProvider) ?? selectedModelForPicker);
   }, [modelOptionsByProvider, selectedModelForPicker, selectedProvider]);
+  const opencodeReasoningOptions = useMemo(
+    () =>
+      getOpenCodeReasoningOptions(
+        serverConfigQuery.data?.providers ?? EMPTY_PROVIDER_STATUSES,
+        selectedModelForPickerWithCustomFallback,
+      ),
+    [selectedModelForPickerWithCustomFallback, serverConfigQuery.data?.providers],
+  );
+  const reasoningOptions =
+    selectedProvider === "opencode"
+      ? opencodeReasoningOptions
+      : getReasoningEffortOptions(selectedProvider);
+  const codexReasoningOptions = useMemo(
+    () => reasoningOptions.filter(isCodexReasoningEffort),
+    [reasoningOptions],
+  );
+  const supportsReasoningEffort = reasoningOptions.length > 0;
+  const selectedEffort = composerDraft.effort ?? getDefaultReasoningEffort(selectedProvider);
+  const selectedCodexEffort = isCodexReasoningEffort(selectedEffort) ? selectedEffort : null;
+  const selectedCodexFastModeEnabled =
+    selectedProvider === "codex" ? composerDraft.codexFastMode : false;
+  const selectedModelOptionsForDispatch = useMemo(() => {
+    if (selectedProvider === "codex") {
+      const codexOptions = {
+        ...(supportsReasoningEffort && selectedCodexEffort
+          ? { reasoningEffort: selectedCodexEffort }
+          : {}),
+        ...(selectedCodexFastModeEnabled ? { fastMode: true } : {}),
+      };
+      return Object.keys(codexOptions).length > 0 ? { codex: codexOptions } : undefined;
+    }
+    if (selectedProvider === "opencode") {
+      const reasoningEffort =
+        selectedEffort && isOpenCodeReasoningEffort(selectedEffort) ? selectedEffort : undefined;
+      return reasoningEffort ? { opencode: { reasoningEffort } } : undefined;
+    }
+    return undefined;
+  }, [
+    selectedCodexEffort,
+    selectedCodexFastModeEnabled,
+    selectedEffort,
+    selectedProvider,
+    supportsReasoningEffort,
+  ]);
+  const providerOptionsForDispatch = useMemo(() => {
+    const codexOptions = {
+      ...(settings.codexBinaryPath ? { binaryPath: settings.codexBinaryPath } : {}),
+      ...(settings.codexHomePath ? { homePath: settings.codexHomePath } : {}),
+    };
+    return Object.keys(codexOptions).length > 0 ? { codex: codexOptions } : undefined;
+  }, [settings.codexBinaryPath, settings.codexHomePath]);
   const searchableModelOptions = useMemo(
     () =>
       AVAILABLE_PROVIDER_OPTIONS.filter(
@@ -912,7 +982,6 @@ export default function ChatView({ threadId }: ChatViewProps) {
   );
   const effectivePathQuery = pathTriggerQuery.length > 0 ? debouncedPathQuery : "";
   const branchesQuery = useQuery(gitBranchesQueryOptions(gitCwd));
-  const serverConfigQuery = useQuery(serverConfigQueryOptions());
   const workspaceEntriesQuery = useQuery(
     projectSearchEntriesQueryOptions({
       cwd: gitCwd,
@@ -2880,21 +2949,27 @@ export default function ChatView({ threadId }: ChatViewProps) {
       setComposerDraftProvider(activeThread.id, provider);
       setComposerDraftModel(
         activeThread.id,
-        resolveAppModelSelection(provider, settings.customCodexModels, model),
+        resolveAppModelSelection(
+          provider,
+          getCustomModelsForProvider(settings, provider),
+          model,
+          modelOptionsByProvider[provider],
+        ),
       );
       scheduleComposerFocus();
     },
     [
       activeThread,
       lockedProvider,
+      modelOptionsByProvider,
       scheduleComposerFocus,
       setComposerDraftModel,
       setComposerDraftProvider,
-      settings.customCodexModels,
+      settings,
     ],
   );
   const onEffortSelect = useCallback(
-    (effort: CodexReasoningEffort) => {
+    (effort: ReasoningEffort | null) => {
       setComposerDraftEffort(threadId, effort);
       scheduleComposerFocus();
     },
@@ -3344,7 +3419,6 @@ export default function ChatView({ threadId }: ChatViewProps) {
                   </div>
                 ) : null}
 
-                {/* Textarea area */}
                 <div
                   className={cn(
                     "relative px-3 pb-2 sm:px-4",
@@ -3506,10 +3580,10 @@ export default function ChatView({ threadId }: ChatViewProps) {
                           interactionMode={interactionMode}
                           planSidebarOpen={planSidebarOpen}
                           runtimeMode={runtimeMode}
-                          selectedEffort={selectedEffort}
+                          selectedEffort={selectedCodexEffort}
                           selectedProvider={selectedProvider}
                           selectedCodexFastModeEnabled={selectedCodexFastModeEnabled}
-                          reasoningOptions={reasoningOptions}
+                          reasoningOptions={codexReasoningOptions}
                           onEffortSelect={onEffortSelect}
                           onCodexFastModeChange={onCodexFastModeChange}
                           onToggleInteractionMode={toggleInteractionMode}
@@ -3518,16 +3592,16 @@ export default function ChatView({ threadId }: ChatViewProps) {
                         />
                       ) : (
                         <>
-                          {selectedProvider === "codex" && selectedEffort != null ? (
+                          {selectedProvider === "codex" && selectedCodexEffort != null ? (
                             <>
                               <Separator
                                 orientation="vertical"
                                 className="mx-0.5 hidden h-4 sm:block"
                               />
                               <CodexTraitsPicker
-                                effort={selectedEffort}
+                                effort={selectedCodexEffort}
                                 fastModeEnabled={selectedCodexFastModeEnabled}
-                                options={reasoningOptions}
+                                options={codexReasoningOptions}
                                 onEffortChange={onEffortSelect}
                                 onFastModeChange={onCodexFastModeChange}
                               />

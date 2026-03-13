@@ -512,6 +512,55 @@ describe("deriveWorkLogEntries", () => {
       "apps/web/src/session-logic.ts",
     ]);
   });
+
+  it("collapses repeated tool lifecycle updates for the same tool item", () => {
+    const activities: OrchestrationThreadActivity[] = [
+      makeActivity({
+        id: "tool-update-1",
+        createdAt: "2026-02-23T00:00:01.000Z",
+        kind: "tool.updated",
+        summary: "Bash",
+        payload: {
+          itemId: "tool-part-1",
+          data: {
+            item: {
+              id: "tool-part-1",
+              callID: "call-1",
+            },
+          },
+        },
+      }),
+      makeActivity({
+        id: "tool-update-2",
+        createdAt: "2026-02-23T00:00:02.000Z",
+        kind: "tool.updated",
+        summary: "Bash",
+        payload: {
+          itemId: "tool-part-1",
+          data: {
+            item: {
+              id: "tool-part-1",
+              callID: "call-1",
+            },
+          },
+        },
+      }),
+      makeActivity({
+        id: "tool-complete",
+        createdAt: "2026-02-23T00:00:03.000Z",
+        kind: "tool.completed",
+        summary: "Bash complete",
+        payload: {
+          itemId: "tool-part-1",
+        },
+      }),
+    ];
+
+    const entries = deriveWorkLogEntries(activities, undefined);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.id).toBe("tool-complete");
+    expect(entries[0]?.label).toBe("Bash complete");
+  });
 });
 
 describe("deriveTimelineEntries", () => {
@@ -673,14 +722,21 @@ describe("deriveActiveWorkStartedAt", () => {
 });
 
 describe("PROVIDER_OPTIONS", () => {
-  it("keeps Claude Code and Cursor visible as unavailable placeholders in the stack base", () => {
+  it("exposes Codex and OpenCode while keeping Claude Code and Cursor as unavailable placeholders", () => {
+    const opencode = PROVIDER_OPTIONS.find((option) => option.value === "opencode");
     const claude = PROVIDER_OPTIONS.find((option) => option.value === "claudeCode");
     const cursor = PROVIDER_OPTIONS.find((option) => option.value === "cursor");
     expect(PROVIDER_OPTIONS).toEqual([
       { value: "codex", label: "Codex", available: true },
+      { value: "opencode", label: "OpenCode", available: true },
       { value: "claudeCode", label: "Claude Code", available: false },
       { value: "cursor", label: "Cursor", available: false },
     ]);
+    expect(opencode).toEqual({
+      value: "opencode",
+      label: "OpenCode",
+      available: true,
+    });
     expect(claude).toEqual({
       value: "claudeCode",
       label: "Claude Code",

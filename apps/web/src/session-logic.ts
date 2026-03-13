@@ -26,6 +26,7 @@ export const PROVIDER_OPTIONS: Array<{
   available: boolean;
 }> = [
   { value: "codex", label: "Codex", available: true },
+  { value: "opencode", label: "OpenCode", available: true },
   { value: "claudeCode", label: "Claude Code", available: false },
   { value: "cursor", label: "Cursor", available: false },
 ];
@@ -408,50 +409,67 @@ export function deriveWorkLogEntries(
   latestTurnId: TurnId | undefined,
 ): WorkLogEntry[] {
   const ordered = [...activities].toSorted(compareActivitiesByOrder);
-  return ordered
+  const filtered = ordered
     .filter((activity) => (latestTurnId ? activity.turnId === latestTurnId : true))
     .filter((activity) => activity.kind !== "tool.started")
     .filter((activity) => activity.kind !== "task.started" && activity.kind !== "task.completed")
-    .filter((activity) => activity.summary !== "Checkpoint captured")
-    .map((activity) => {
-      const payload =
-        activity.payload && typeof activity.payload === "object"
-          ? (activity.payload as Record<string, unknown>)
-          : null;
-      const command = extractToolCommand(payload);
-      const changedFiles = extractChangedFiles(payload);
-      const title = extractToolTitle(payload);
-      const entry: WorkLogEntry = {
-        id: activity.id,
-        createdAt: activity.createdAt,
-        label: activity.summary,
-        tone: activity.tone === "approval" ? "info" : activity.tone,
-      };
-      const itemType = extractWorkLogItemType(payload);
-      const requestKind = extractWorkLogRequestKind(payload);
-      if (payload && typeof payload.detail === "string" && payload.detail.length > 0) {
-        const detail = stripTrailingExitCode(payload.detail).output;
-        if (detail) {
-          entry.detail = detail;
-        }
+    .filter((activity) => activity.summary !== "Checkpoint captured");
+
+  const entries: WorkLogEntry[] = [];
+  const toolEntryIndexByIdentity = new Map<string, number>();
+
+  for (const activity of filtered) {
+    const payload =
+      activity.payload && typeof activity.payload === "object"
+        ? (activity.payload as Record<string, unknown>)
+        : null;
+    const command = extractToolCommand(payload);
+    const changedFiles = extractChangedFiles(payload);
+    const title = extractToolTitle(payload);
+    const entry: WorkLogEntry = {
+      id: activity.id,
+      createdAt: activity.createdAt,
+      label: activity.summary,
+      tone: activity.tone === "approval" ? "info" : activity.tone,
+    };
+    const itemType = extractWorkLogItemType(payload);
+    const requestKind = extractWorkLogRequestKind(payload);
+    if (payload && typeof payload.detail === "string" && payload.detail.length > 0) {
+      const detail = stripTrailingExitCode(payload.detail).output;
+      if (detail) {
+        entry.detail = detail;
       }
-      if (command) {
-        entry.command = command;
+    }
+    if (command) {
+      entry.command = command;
+    }
+    if (changedFiles.length > 0) {
+      entry.changedFiles = changedFiles;
+    }
+    if (title) {
+      entry.toolTitle = title;
+    }
+    if (itemType) {
+      entry.itemType = itemType;
+    }
+    if (requestKind) {
+      entry.requestKind = requestKind;
+    }
+
+    const toolIdentity = activity.tone === "tool" ? extractToolIdentity(payload) : null;
+    if (toolIdentity) {
+      const existingIndex = toolEntryIndexByIdentity.get(toolIdentity);
+      if (existingIndex !== undefined) {
+        entries[existingIndex] = entry;
+        continue;
       }
-      if (changedFiles.length > 0) {
-        entry.changedFiles = changedFiles;
-      }
-      if (title) {
-        entry.toolTitle = title;
-      }
-      if (itemType) {
-        entry.itemType = itemType;
-      }
-      if (requestKind) {
-        entry.requestKind = requestKind;
-      }
-      return entry;
-    });
+      toolEntryIndexByIdentity.set(toolIdentity, entries.length);
+    }
+
+    entries.push(entry);
+  }
+
+  return entries;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -539,6 +557,18 @@ function extractWorkLogRequestKind(
     return payload.requestKind;
   }
   return requestKindFromRequestType(payload?.requestType) ?? undefined;
+}
+
+function extractToolIdentity(payload: Record<string, unknown> | null): string | null {
+  const data = asRecord(payload?.data);
+  const item = asRecord(data?.item);
+  const candidates = [
+    asTrimmedString(payload?.itemId),
+    asTrimmedString(item?.id),
+    asTrimmedString(item?.callID),
+    asTrimmedString(data?.itemId),
+  ];
+  return candidates.find((candidate) => candidate !== null) ?? null;
 }
 
 function pushChangedFile(target: string[], seen: Set<string>, value: unknown) {

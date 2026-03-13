@@ -14,9 +14,11 @@ import type {
   ServerProviderStatus,
   ServerProviderStatusState,
 } from "@t3tools/contracts";
-import { Array, Effect, Fiber, FileSystem, Layer, Option, Path, Result, Stream } from "effect";
+import { Data, Effect, FileSystem, Fiber, Layer, Option, Path, Result, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
+import { ServerConfig } from "../../config";
+import { fetchOpenCodeModels } from "../../opencodeServerManager";
 import {
   formatCodexCliUpgradeMessage,
   isCodexCliVersionSupported,
@@ -25,9 +27,28 @@ import {
 import { ProviderHealth, type ProviderHealthShape } from "../Services/ProviderHealth";
 
 const DEFAULT_TIMEOUT_MS = 4_000;
+const DEFAULT_OPENCODE_SERVER_URL = "http://127.0.0.1:6733";
 const CODEX_PROVIDER = "codex" as const;
+const OPENCODE_PROVIDER = "opencode" as const;
 
-// ── Pure helpers ────────────────────────────────────────────────────
+class OpenCodeModelDiscoveryError extends Data.TaggedError("OpenCodeModelDiscoveryError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+const discoverOpenCodeModels = (input: { directory: string; serverUrl?: string }) =>
+  Effect.tryPromise({
+    try: () =>
+      fetchOpenCodeModels({
+        directory: input.directory,
+        ...(input.serverUrl ? { serverUrl: input.serverUrl } : {}),
+      }),
+    catch: (cause) =>
+      new OpenCodeModelDiscoveryError({
+        message: cause instanceof Error ? cause.message : "OpenCode model discovery failed.",
+        cause,
+      }),
+  });
 
 export interface CommandResult {
   readonly stdout: string;
@@ -49,6 +70,18 @@ function isCommandMissingCause(error: unknown): boolean {
     lower.includes("spawn codex enoent") ||
     lower.includes("enoent") ||
     lower.includes("notfound")
+  );
+}
+
+function isSpecificCommandMissingCause(command: string, error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const target = command.toLowerCase();
+  const lower = error.message.toLowerCase();
+  return (
+    lower.includes(`command not found: ${target}`) ||
+    lower.includes(`spawn ${target} enoent`) ||
+    (lower.includes("enoent") && lower.includes(target)) ||
+    (lower.includes("notfound") && lower.includes(target))
   );
 }
 
@@ -168,27 +201,8 @@ export function parseAuthStatusFromOutput(result: CommandResult): {
   };
 }
 
-// ── Codex CLI config detection ──────────────────────────────────────
-
-/**
- * Providers that use OpenAI-native authentication via `codex login`.
- * When the configured `model_provider` is one of these, the `codex login
- * status` probe still runs. For any other provider value the auth probe
- * is skipped because authentication is handled externally (e.g. via
- * environment variables like `PORTKEY_API_KEY` or `AZURE_API_KEY`).
- */
 const OPENAI_AUTH_PROVIDERS = new Set(["openai"]);
 
-/**
- * Read the `model_provider` value from the Codex CLI config file.
- *
- * Looks for the file at `$CODEX_HOME/config.toml` (falls back to
- * `~/.codex/config.toml`). Uses a simple line-by-line scan rather than
- * a full TOML parser to avoid adding a dependency for a single key.
- *
- * Returns `undefined` when the file does not exist or does not set
- * `model_provider`.
- */
 export const readCodexConfigModelProvider = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -202,15 +216,10 @@ export const readCodexConfigModelProvider = Effect.gen(function* () {
     return undefined;
   }
 
-  // We need to find `model_provider = "..."` at the top level of the
-  // TOML file (i.e. before any `[section]` header). Lines inside
-  // `[profiles.*]`, `[model_providers.*]`, etc. are ignored.
   let inTopLevel = true;
   for (const line of content.split("\n")) {
     const trimmed = line.trim();
-    // Skip comments and empty lines.
     if (!trimmed || trimmed.startsWith("#")) continue;
-    // Detect section headers — once we leave the top level, stop.
     if (trimmed.startsWith("[")) {
       inTopLevel = false;
       continue;
@@ -223,18 +232,10 @@ export const readCodexConfigModelProvider = Effect.gen(function* () {
   return undefined;
 });
 
-/**
- * Returns `true` when the Codex CLI is configured with a custom
- * (non-OpenAI) model provider, meaning `codex login` auth is not
- * required because authentication is handled through provider-specific
- * environment variables.
- */
 export const hasCustomModelProvider = Effect.map(
   readCodexConfigModelProvider,
   (provider) => provider !== undefined && !OPENAI_AUTH_PROVIDERS.has(provider),
 );
-
-// ── Effect-native command execution ─────────────────────────────────
 
 const collectStreamAsString = <E>(stream: Stream.Stream<Uint8Array, E>): Effect.Effect<string, E> =>
   Stream.runFold(
@@ -243,10 +244,10 @@ const collectStreamAsString = <E>(stream: Stream.Stream<Uint8Array, E>): Effect.
     (acc, chunk) => acc + new TextDecoder().decode(chunk),
   );
 
-const runCodexCommand = (args: ReadonlyArray<string>) =>
+const runCommand = (commandName: string, args: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const command = ChildProcess.make("codex", [...args], {
+    const command = ChildProcess.make(commandName, [...args], {
       shell: process.platform === "win32",
     });
 
@@ -264,7 +265,8 @@ const runCodexCommand = (args: ReadonlyArray<string>) =>
     return { stdout, stderr, code: exitCode } satisfies CommandResult;
   }).pipe(Effect.scoped);
 
-// ── Health check ────────────────────────────────────────────────────
+const runCodexCommand = (args: ReadonlyArray<string>) => runCommand("codex", args);
+const runOpenCodeCommand = (args: ReadonlyArray<string>) => runCommand("opencode", args);
 
 export const checkCodexProviderStatus: Effect.Effect<
   ServerProviderStatus,
@@ -273,7 +275,6 @@ export const checkCodexProviderStatus: Effect.Effect<
 > = Effect.gen(function* () {
   const checkedAt = new Date().toISOString();
 
-  // Probe 1: `codex --version` — is the CLI reachable?
   const versionProbe = yield* runCodexCommand(["--version"]).pipe(
     Effect.timeoutOption(DEFAULT_TIMEOUT_MS),
     Effect.result,
@@ -331,12 +332,6 @@ export const checkCodexProviderStatus: Effect.Effect<
     };
   }
 
-  // Probe 2: `codex login status` — is the user authenticated?
-  //
-  // Custom model providers (e.g. Portkey, Azure OpenAI proxy) handle
-  // authentication through their own environment variables, so `codex
-  // login status` will report "not logged in" even when the CLI works
-  // fine.  Skip the auth probe entirely for non-OpenAI providers.
   if (yield* hasCustomModelProvider) {
     return {
       provider: CODEX_PROVIDER,
@@ -390,18 +385,128 @@ export const checkCodexProviderStatus: Effect.Effect<
   } satisfies ServerProviderStatus;
 });
 
-// ── Layer ───────────────────────────────────────────────────────────
+export const checkOpenCodeProviderStatus: Effect.Effect<
+  ServerProviderStatus,
+  never,
+  ChildProcessSpawner.ChildProcessSpawner
+> = Effect.gen(function* () {
+  const checkedAt = new Date().toISOString();
+  const versionProbe = yield* runOpenCodeCommand(["--version"]).pipe(
+    Effect.timeoutOption(DEFAULT_TIMEOUT_MS),
+    Effect.result,
+  );
+
+  if (Result.isFailure(versionProbe)) {
+    const error = versionProbe.failure;
+    return {
+      provider: OPENCODE_PROVIDER,
+      status: "error" as const,
+      available: false,
+      authStatus: "unknown" as const,
+      checkedAt,
+      message: isSpecificCommandMissingCause("opencode", error)
+        ? "OpenCode CLI (`opencode`) is not installed or not on PATH."
+        : `Failed to execute OpenCode CLI health check: ${error instanceof Error ? error.message : String(error)}.`,
+    };
+  }
+
+  if (Option.isNone(versionProbe.success)) {
+    return {
+      provider: OPENCODE_PROVIDER,
+      status: "error" as const,
+      available: false,
+      authStatus: "unknown" as const,
+      checkedAt,
+      message: "OpenCode CLI is installed but failed to run. Timed out while running command.",
+    };
+  }
+
+  const version = versionProbe.success.value;
+  if (version.code !== 0) {
+    const detail = detailFromResult(version);
+    return {
+      provider: OPENCODE_PROVIDER,
+      status: "error" as const,
+      available: false,
+      authStatus: "unknown" as const,
+      checkedAt,
+      message: detail
+        ? `OpenCode CLI is installed but failed to run. ${detail}`
+        : "OpenCode CLI is installed but failed to run.",
+    };
+  }
+
+  return {
+    provider: OPENCODE_PROVIDER,
+    status: "ready" as const,
+    available: true,
+    authStatus: "unknown" as const,
+    checkedAt,
+    message: "OpenCode CLI is available.",
+  } satisfies ServerProviderStatus;
+});
 
 export const ProviderHealthLive = Layer.effect(
   ProviderHealth,
   Effect.gen(function* () {
-    const codexStatusFiber = yield* checkCodexProviderStatus.pipe(
-      Effect.map(Array.of),
-      Effect.forkScoped,
-    );
+    const serverConfig = yield* ServerConfig;
+    const codexStatusFiber = yield* checkCodexProviderStatus.pipe(Effect.forkScoped);
+    const opencodeBaseStatusFiber = yield* checkOpenCodeProviderStatus.pipe(Effect.forkScoped);
 
     return {
-      getStatuses: Fiber.join(codexStatusFiber),
+      getStatuses: Effect.gen(function* () {
+        const codexStatus = yield* Fiber.join(codexStatusFiber);
+        const opencodeBaseStatus = yield* Fiber.join(opencodeBaseStatusFiber);
+        let opencodeStatus = opencodeBaseStatus;
+
+        if (opencodeBaseStatus.available && opencodeBaseStatus.status !== "error") {
+          opencodeStatus = yield* discoverOpenCodeModels({
+            directory: serverConfig.cwd,
+          }).pipe(
+            Effect.map((models) => ({
+              ...opencodeBaseStatus,
+              ...(models.length > 0 ? { models } : {}),
+              ...(models.length === 0
+                ? {
+                    status: "warning" as const,
+                    message: "OpenCode is available but did not return any models.",
+                  }
+                : {}),
+            })),
+            Effect.catch((cause) =>
+              Effect.succeed({
+                ...opencodeBaseStatus,
+                status: "warning" as const,
+                message: `OpenCode is available but model discovery failed: ${cause.message}`,
+              }),
+            ),
+          );
+        }
+
+        if (!opencodeStatus.available || opencodeStatus.status === "error") {
+          const discovered = yield* discoverOpenCodeModels({
+            directory: serverConfig.cwd,
+            serverUrl: DEFAULT_OPENCODE_SERVER_URL,
+          }).pipe(Effect.result);
+          if (Result.isSuccess(discovered)) {
+            const models = discovered.success;
+            opencodeStatus = {
+              provider: OPENCODE_PROVIDER,
+              status: models.length > 0 ? "ready" : "warning",
+              available: true,
+              authStatus: "unknown",
+              checkedAt: new Date().toISOString(),
+              message:
+                models.length > 0
+                  ? "Connected to a running OpenCode server at http://127.0.0.1:6733."
+                  : "Connected to a running OpenCode server, but it returned no models.",
+              ...(models.length > 0 ? { models } : {}),
+            };
+          }
+        }
+
+        return [codexStatus, opencodeStatus];
+      }),
     } satisfies ProviderHealthShape;
   }),
 );

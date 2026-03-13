@@ -7,7 +7,7 @@
  *
  * @module ProviderAdapterRegistryLive
  */
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option } from "effect";
 
 import { ProviderUnsupportedError, type ProviderAdapterError } from "../Errors.ts";
 import type { ProviderAdapterShape } from "../Services/ProviderAdapter.ts";
@@ -16,6 +16,7 @@ import {
   type ProviderAdapterRegistryShape,
 } from "../Services/ProviderAdapterRegistry.ts";
 import { CodexAdapter } from "../Services/CodexAdapter.ts";
+import { OpenCodeAdapter } from "../Services/OpenCodeAdapter.ts";
 
 export interface ProviderAdapterRegistryLiveOptions {
   readonly adapters?: ReadonlyArray<ProviderAdapterShape<ProviderAdapterError>>;
@@ -23,7 +24,16 @@ export interface ProviderAdapterRegistryLiveOptions {
 
 const makeProviderAdapterRegistry = (options?: ProviderAdapterRegistryLiveOptions) =>
   Effect.gen(function* () {
-    const adapters = options?.adapters !== undefined ? options.adapters : [yield* CodexAdapter];
+    const adapters =
+      options?.adapters !== undefined
+        ? options.adapters
+        : [
+            yield* CodexAdapter,
+            ...Option.match(yield* Effect.serviceOption(OpenCodeAdapter), {
+              onNone: () => [],
+              onSome: (adapter) => [adapter],
+            }),
+          ];
     const byProvider = new Map(adapters.map((adapter) => [adapter.provider, adapter]));
 
     const getByProvider: ProviderAdapterRegistryShape["getByProvider"] = (provider) => {

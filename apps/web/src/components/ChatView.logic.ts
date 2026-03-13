@@ -1,4 +1,9 @@
-import { ProjectId, type ProviderKind, type ThreadId } from "@t3tools/contracts";
+import {
+  ProjectId,
+  type ProviderKind,
+  type ServerProviderStatus,
+  type ThreadId,
+} from "@t3tools/contracts";
 import { type ChatMessage, type Thread } from "../types";
 import { randomUUID } from "~/lib/utils";
 import { getAppModelOptions } from "../appSettings";
@@ -116,10 +121,33 @@ export function cloneComposerImageForRetry(
   }
 }
 
-export function getCustomModelOptionsByProvider(settings: {
-  customCodexModels: readonly string[];
-}): Record<ProviderKind, ReadonlyArray<{ slug: string; name: string }>> {
+export function getCustomModelOptionsByProvider(
+  settings: {
+    customCodexModels: readonly string[];
+    customOpencodeModels: readonly string[];
+  },
+  providerStatuses: ReadonlyArray<ServerProviderStatus> = [],
+): Record<ProviderKind, ReadonlyArray<{ slug: string; name: string }>> {
+  const opencodeModels =
+    providerStatuses.find((status) => status.provider === "opencode")?.models ?? [];
+
   return {
     codex: getAppModelOptions("codex", settings.customCodexModels),
+    opencode: getAppModelOptions(
+      "opencode",
+      settings.customOpencodeModels,
+      undefined,
+      opencodeModels,
+    ),
   };
+}
+
+export function getCustomModelsForProvider(
+  settings: {
+    customCodexModels: readonly string[];
+    customOpencodeModels: readonly string[];
+  },
+  provider: ProviderKind,
+): readonly string[] {
+  return provider === "opencode" ? settings.customOpencodeModels : settings.customCodexModels;
 }

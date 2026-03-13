@@ -3,6 +3,17 @@ import { ProviderKind } from "./orchestration";
 
 export const CODEX_REASONING_EFFORT_OPTIONS = ["xhigh", "high", "medium", "low"] as const;
 export type CodexReasoningEffort = (typeof CODEX_REASONING_EFFORT_OPTIONS)[number];
+export const OPENCODE_REASONING_EFFORT_OPTIONS = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
+export type OpenCodeReasoningEffort = (typeof OPENCODE_REASONING_EFFORT_OPTIONS)[number];
+export type ReasoningEffort = CodexReasoningEffort | OpenCodeReasoningEffort;
 
 export const CodexModelOptions = Schema.Struct({
   reasoningEffort: Schema.optional(Schema.Literals(CODEX_REASONING_EFFORT_OPTIONS)),
@@ -10,14 +21,25 @@ export const CodexModelOptions = Schema.Struct({
 });
 export type CodexModelOptions = typeof CodexModelOptions.Type;
 
+export const OpencodeModelOptions = Schema.Struct({
+  providerId: Schema.optional(Schema.String),
+  modelId: Schema.optional(Schema.String),
+  variant: Schema.optional(Schema.String),
+  reasoningEffort: Schema.optional(Schema.Literals(OPENCODE_REASONING_EFFORT_OPTIONS)),
+  agent: Schema.optional(Schema.String),
+});
+export type OpencodeModelOptions = typeof OpencodeModelOptions.Type;
+
 export const ProviderModelOptions = Schema.Struct({
   codex: Schema.optional(CodexModelOptions),
+  opencode: Schema.optional(OpencodeModelOptions),
 });
 export type ProviderModelOptions = typeof ProviderModelOptions.Type;
 
 type ModelOption = {
   readonly slug: string;
   readonly name: string;
+  readonly variants?: readonly OpenCodeReasoningEffort[];
 };
 
 export const MODEL_OPTIONS_BY_PROVIDER = {
@@ -28,6 +50,7 @@ export const MODEL_OPTIONS_BY_PROVIDER = {
     { slug: "gpt-5.2-codex", name: "GPT-5.2 Codex" },
     { slug: "gpt-5.2", name: "GPT-5.2" },
   ],
+  opencode: [] as readonly ModelOption[],
 } as const satisfies Record<ProviderKind, readonly ModelOption[]>;
 export type ModelOptionsByProvider = typeof MODEL_OPTIONS_BY_PROVIDER;
 
@@ -36,6 +59,7 @@ export type ModelSlug = BuiltInModelSlug | (string & {});
 
 export const DEFAULT_MODEL_BY_PROVIDER = {
   codex: "gpt-5.4",
+  opencode: "gpt-5",
 } as const satisfies Record<ProviderKind, ModelSlug>;
 
 export const MODEL_SLUG_ALIASES_BY_PROVIDER = {
@@ -46,12 +70,15 @@ export const MODEL_SLUG_ALIASES_BY_PROVIDER = {
     "5.3-spark": "gpt-5.3-codex-spark",
     "gpt-5.3-spark": "gpt-5.3-codex-spark",
   },
+  opencode: {},
 } as const satisfies Record<ProviderKind, Record<string, ModelSlug>>;
 
 export const REASONING_EFFORT_OPTIONS_BY_PROVIDER = {
   codex: CODEX_REASONING_EFFORT_OPTIONS,
-} as const satisfies Record<ProviderKind, readonly CodexReasoningEffort[]>;
+  opencode: OPENCODE_REASONING_EFFORT_OPTIONS,
+} as const satisfies Record<ProviderKind, readonly ReasoningEffort[]>;
 
 export const DEFAULT_REASONING_EFFORT_BY_PROVIDER = {
   codex: "high",
-} as const satisfies Record<ProviderKind, CodexReasoningEffort | null>;
+  opencode: null,
+} as const satisfies Record<ProviderKind, ReasoningEffort | null>;
