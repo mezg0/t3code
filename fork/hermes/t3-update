@@ -6,6 +6,10 @@
 #   t3-update check      Download a new build into staging and notify (runs
 #                        from launchd). Installs straight away if the app is
 #                        not running.
+#   t3-update watch      Runs under launchd: installs a staged build as soon as
+#                        the app quits, and when the app starts, checks Zeus
+#                        and restarts it into a newer build if one is ready
+#                        within LAUNCH_UPDATE_WINDOW seconds.
 #   t3-update rollback   Restore the previously installed build.
 #   t3-update status     Show installed, staged and latest builds.
 
@@ -18,6 +22,9 @@ APP="/Applications/$APP_NAME.app"
 STATE="$HOME/Library/Application Support/t3-fork"
 STAGED="$STATE/staged"
 PREVIOUS="$STATE/previous"
+# Only restart the app for an update this soon after it opens, so a slow
+# download never interrupts work already under way.
+LAUNCH_UPDATE_WINDOW=30
 
 mkdir -p "$STATE"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
@@ -121,7 +128,7 @@ case "${1:-install}" in
     if app_running; then
       [[ "$(staged_id)" != "$(cat "$STATE/notified-staged" 2>/dev/null || true)" ]] && {
         staged_id >"$STATE/notified-staged"
-        notify "T3 Code (Brandon) update ready" "Run t3-update to restart into $(staged_id)"
+        notify "T3 Code (Brandon) update ready" "Quit and reopen the app to update to $(staged_id)"
       }
     else
       install_staged noreopen
@@ -135,6 +142,29 @@ case "${1:-install}" in
       exit 0
     fi
     install_staged reopen
+    ;;
+  watch)
+    # Start from the current state so an already-open app isn't treated as
+    # just launched (and restarted) when the watcher itself starts.
+    if app_running; then was_running=1; else was_running=0; fi
+    while true; do
+      if app_running; then running=1; else running=0; fi
+      if [[ $running -eq 0 && -n "$(staged_id)" ]]; then
+        install_staged noreopen || true
+      fi
+      if [[ $running -eq 1 && $was_running -eq 0 ]]; then
+        launched_at=$(date +%s)
+        if [[ -z "$(staged_id)" ]]; then
+          { fetch_latest && stage_latest; } || true
+        fi
+        if [[ -n "$(staged_id)" ]] && (($(date +%s) - launched_at < LAUNCH_UPDATE_WINDOW)); then
+          notify "Updating T3 Code (Brandon)" "Restarting into $(staged_id)"
+          install_staged reopen || true
+        fi
+      fi
+      was_running=$running
+      sleep 2
+    done
     ;;
   rollback)
     [[ -d "$PREVIOUS/$APP_NAME.app" ]] || { log "No previous build"; exit 1; }

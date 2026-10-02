@@ -4,7 +4,8 @@
 #
 # Installs t3-update into ~/.local/bin and an "Update T3 Code" app into
 # ~/Applications, schedules `t3-update check` every 30 minutes with launchd,
-# and installs the latest build.
+# starts `t3-update watch` (updates on app quit/start), and installs the latest
+# build.
 
 set -euo pipefail
 
@@ -45,6 +46,29 @@ EOF
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
+
+# Watcher: applies updates when the app quits or starts.
+WATCH_LABEL="com.brandon.t3fork.watch"
+WATCH_PLIST="$HOME/Library/LaunchAgents/$WATCH_LABEL.plist"
+cat >"$WATCH_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>$WATCH_LABEL</string>
+  <key>ProgramArguments</key>
+  <array><string>$BIN</string><string>watch</string></array>
+  <key>EnvironmentVariables</key>
+  <dict><key>T3FORK_ZEUS</key><string>$ZEUS</string></dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>$HOME/Library/Logs/t3-update.log</string>
+  <key>StandardErrorPath</key><string>$HOME/Library/Logs/t3-update.log</string>
+</dict>
+</plist>
+EOF
+launchctl bootout "gui/$(id -u)/$WATCH_LABEL" 2>/dev/null || true
+launchctl bootstrap "gui/$(id -u)" "$WATCH_PLIST"
 
 echo "Installed t3-update. Make sure ~/.local/bin is on your PATH."
 T3FORK_ZEUS="$ZEUS" "$BIN" install
