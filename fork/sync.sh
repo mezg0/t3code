@@ -29,6 +29,13 @@ FORCE=0
 export PATH="$NODE_BIN:$REPO/node_modules/.bin:$HOME/.cargo/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 unset GITHUB_REPOSITORY T3CODE_DESKTOP_UPDATE_REPOSITORY CSC_LINK CSC_KEY_PASSWORD
 
+# Public T3 Connect / sign-in config, copied from the official release build.
+# Upstream CI injects these; without them the build has Connect switched off.
+export T3CODE_CLERK_PUBLISHABLE_KEY="pk_live_Y2xlcmsudDMuY29kZXMk"
+export T3CODE_CLERK_JWT_TEMPLATE="t3-relay"
+export T3CODE_CLERK_CLI_OAUTH_CLIENT_ID="hzxSgY2cH10sDU2r"
+export T3CODE_RELAY_URL="https://relay.t3.codes"
+
 mkdir -p "$BUILDS/logs" "$BUILDS/builds"
 if ! mkdir "$BUILDS/.sync.lock" 2>/dev/null; then
   echo "Another sync is running ($BUILDS/.sync.lock)."
@@ -55,6 +62,23 @@ fail() {
   exit 1
 }
 
+# T3 Code polls git status in this project and briefly holds .git/index.lock.
+wait_for_index_lock() {
+  for _ in $(seq 1 30); do
+    [[ -e "$REPO/.git/index.lock" ]] || return 0
+    sleep 1
+  done
+}
+
+git_retry() {
+  for _ in 1 2 3 4 5; do
+    wait_for_index_lock
+    git "$@" && return 0
+    sleep 2
+  done
+  return 1
+}
+
 verify() {
   log "Typecheck"
   (cd "$REPO" && pnpm typecheck) || return 1
@@ -73,16 +97,17 @@ git fetch -q origin
 git rev-parse -q --verify "refs/tags/$TARGET_TAG" >/dev/null || fail "Upstream tag $TARGET_TAG not found"
 
 [[ -z "$(git status --porcelain)" ]] || fail "Uncommitted changes in $REPO; commit or stash them"
-git switch -q "$BRANCH"
+git_retry switch -q "$BRANCH"
 [[ -z "$(git rev-list "origin/$BRANCH..$BRANCH")" ]] ||
   fail "Local $BRANCH has commits not on origin/$BRANCH; push them first"
-git reset -q --hard "origin/$BRANCH"
+git_retry reset -q --hard "origin/$BRANCH"
 
 BASE_TAG="$(git describe --tags --abbrev=0 --match 'v*-nightly.*' HEAD)"
 log "Fork stack: $(git rev-list --count "$BASE_TAG..HEAD") commit(s) on $BASE_TAG"
 
 if [[ "$BASE_TAG" != "$TARGET_TAG" ]]; then
   log "Rebasing onto $TARGET_TAG"
+  wait_for_index_lock
   if ! git rebase -q --onto "$TARGET_TAG" "$BASE_TAG" "$BRANCH"; then
     git rebase --abort || true
     git reset -q --hard "origin/$BRANCH"
