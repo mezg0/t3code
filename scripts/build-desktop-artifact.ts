@@ -54,7 +54,9 @@ import { Command, Flag } from "effect/unstable/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
-const DESKTOP_APP_ID = "com.t3tools.t3code";
+// Fork builds set these to install alongside the official app.
+const DESKTOP_APP_ID = process.env.T3CODE_DESKTOP_APP_ID?.trim() || "com.t3tools.t3code";
+const DESKTOP_PRODUCT_NAME_OVERRIDE = process.env.T3CODE_DESKTOP_PRODUCT_NAME?.trim();
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
@@ -2614,6 +2616,7 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
 }
 
 export function resolveDesktopProductName(version: string): string {
+  if (DESKTOP_PRODUCT_NAME_OVERRIDE) return DESKTOP_PRODUCT_NAME_OVERRIDE;
   return resolveDesktopUpdateChannel(version) === "nightly"
     ? "T3 Code (Nightly)"
     : (desktopPackageJson.productName ?? "T3 Code");
