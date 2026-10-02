@@ -272,6 +272,7 @@ import {
   type ComposerThreadDraftState,
   type DraftSessionState,
 } from "../composerDraftStore";
+import { useProjectFilterHotkey } from "../fork/projectFilterHotkey";
 
 // Settled-tail paging: recent history is the common lookup; the deep tail
 // stays behind an explicit Show more.
@@ -2625,6 +2626,10 @@ export default function Sidebar() {
   // selection, then clear the guard when the picker opens again.
   const suppressNextScopeChangeRef = useRef(false);
   const highlightedProjectScopeKeyRef = useRef<string | null>(null);
+  useProjectFilterHotkey(() => {
+    suppressNextScopeChangeRef.current = false;
+    dispatchProjectScopeMenu({ type: "open-changed", open: true });
+  }, projectGroups.length > 0);
   const handleProjectSettings = useCallback(
     (
       event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLInputElement>,
