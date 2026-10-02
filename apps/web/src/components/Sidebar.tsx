@@ -1192,12 +1192,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     ? getTriggerDisplayModelLabel(selectedModel)
     : thread.modelSelection.model;
 
-  // The local environment is "this machine" and needs no marker; every other
-  // one gets its machine glyph. With no local environment (the hosted app)
-  // that is every thread, which is the point: the glyph is what tells rows on
-  // different machines apart.
-  const isRemote = thread.environmentId !== props.currentEnvironmentId;
-
   const detailsTooltip = (
     <SidebarThreadTooltip
       thread={thread}
@@ -1780,28 +1774,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                   Regenerating title
                 </span>
               ) : null}
-              <span className="flex shrink-0 items-center gap-1.5 text-secondary-label text-xs">
-                {terminalStatusIcon}
-                {prBadge}
-                {diff ? (
-                  <span className="shrink-0 font-mono">
-                    <span className="text-diff-addition-foreground">+{diff.insertions}</span>{" "}
-                    <span className="text-diff-deletion-foreground">−{diff.deletions}</span>
-                  </span>
-                ) : null}
-                {isRemote ? (
-                  <span
-                    aria-hidden
-                    className="pointer-events-none inline-flex shrink-0 items-center text-sidebar-muted-foreground/70"
-                  >
-                    <EnvironmentMachineIcon
-                      aria-hidden
-                      kind={props.environmentMachine}
-                      className="size-3.5"
-                    />
-                  </span>
-                ) : null}
-              </span>
               {pinIndicator}
               {/* The visible state owns this slot's width: status at rest,
                   actions on hover/keyboard focus or while the popover is open. Keeping
@@ -1810,7 +1782,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
               {sortable?.isDragging ? (
                 dragDestination
               ) : (
-                <span className="group/sidebar-status-slot relative ml-auto flex h-5 shrink-0 items-stretch justify-end text-xs">
+                <span className="group/sidebar-status-slot relative flex h-5 shrink-0 items-stretch justify-end text-xs">
                   {/* Read-only status labels yield to the hover actions. Woke is
                     itself an action, so it stays pointer-enabled and visible
                     while the other controls appear beside it. */}
@@ -1921,12 +1893,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                                 type="button"
                                 aria-label="Settle thread"
                                 onClick={handleSettleClick}
-                                className="-mr-1 inline-flex cursor-pointer items-center gap-1 rounded-md bg-transparent px-1.5 text-xs text-muted-foreground hover:text-foreground"
+                                className="-mr-1 inline-flex cursor-pointer items-center rounded-md bg-transparent px-1.5 text-muted-foreground hover:text-foreground"
                               />
                             }
                           >
                             <CheckIcon className="size-3.5" />
-                            Settle
                           </TooltipTrigger>
                           <TooltipPopup>Settle thread</TooltipPopup>
                         </Tooltip>
@@ -1935,6 +1906,18 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                   ) : null}
                 </span>
               )}
+              {/* Fork: badges sit last so hover actions, which appear before
+                  them, only shorten the title and never move the badges. */}
+              <span className="flex shrink-0 items-center gap-1.5 text-secondary-label text-xs">
+                {terminalStatusIcon}
+                {prBadge}
+                {diff ? (
+                  <span className="shrink-0 font-mono">
+                    <span className="text-diff-addition-foreground">+{diff.insertions}</span>{" "}
+                    <span className="text-diff-deletion-foreground">−{diff.deletions}</span>
+                  </span>
+                ) : null}
+              </span>
             </div>
           </div>
           {props.jumpLabel ? <JumpHintBadge label={props.jumpLabel} /> : null}
