@@ -29,13 +29,6 @@ FORCE=0
 export PATH="$NODE_BIN:$REPO/node_modules/.bin:$HOME/.cargo/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 unset GITHUB_REPOSITORY T3CODE_DESKTOP_UPDATE_REPOSITORY CSC_LINK CSC_KEY_PASSWORD
 
-# Public T3 Connect / sign-in config, copied from the official release build.
-# Upstream CI injects these; without them the build has Connect switched off.
-export T3CODE_CLERK_PUBLISHABLE_KEY="pk_live_Y2xlcmsudDMuY29kZXMk"
-export T3CODE_CLERK_JWT_TEMPLATE="t3-relay"
-export T3CODE_CLERK_CLI_OAUTH_CLIENT_ID="hzxSgY2cH10sDU2r"
-export T3CODE_RELAY_URL="https://relay.t3.codes"
-
 mkdir -p "$BUILDS/logs" "$BUILDS/builds"
 if ! mkdir "$BUILDS/.sync.lock" 2>/dev/null; then
   echo "Another sync is running ($BUILDS/.sync.lock)."
@@ -133,7 +126,14 @@ verify || fail "Typecheck/tests fail on $TARGET_TAG"
 OUT="$BUILDS/builds/${BUILD_ID/+/-}"
 rm -rf "$OUT"
 log "Building $PRODUCT_NAME $BUILD_ID"
-T3CODE_DESKTOP_PRODUCT_NAME="$PRODUCT_NAME" T3CODE_DESKTOP_APP_ID="$APP_ID" \
+# Public T3 Connect / sign-in config, copied from the official release build.
+# Upstream CI injects these; without them the build has Connect switched off.
+# Scoped to the build so the unit tests don't see them.
+T3CODE_CLERK_PUBLISHABLE_KEY="pk_live_Y2xlcmsudDMuY29kZXMk" \
+  T3CODE_CLERK_JWT_TEMPLATE="t3-relay" \
+  T3CODE_CLERK_CLI_OAUTH_CLIENT_ID="hzxSgY2cH10sDU2r" \
+  T3CODE_RELAY_URL="https://relay.t3.codes" \
+  T3CODE_DESKTOP_PRODUCT_NAME="$PRODUCT_NAME" T3CODE_DESKTOP_APP_ID="$APP_ID" \
   node scripts/build-desktop-artifact.ts --platform mac --target zip --arch arm64 \
   --build-version "$TARGET_VERSION" --output-dir "$OUT" || fail "Desktop build failed"
 
