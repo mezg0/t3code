@@ -9,6 +9,7 @@ import {
   type SidebarListMarker,
 } from "../Sidebar.logic";
 import { SIDEBAR_SORTABLE_DRAG_DISABLED } from "./SidebarThreadRow";
+import { SidebarPinnedDivider } from "../../fork/SidebarPinnedDivider";
 
 function SortableSidebarMarker(props: {
   marker: SidebarListMarker;
@@ -69,6 +70,9 @@ export function SidebarDragBoundary(props: {
   label: string;
   visible: boolean;
   isDropTarget: boolean;
+  // Fork: a divider line shown at rest. It takes no layout space, so drag
+  // measurements are unchanged; the label replaces it while dragging.
+  restDivider?: boolean;
 }) {
   return (
     <SortableSidebarMarker
@@ -76,6 +80,7 @@ export function SidebarDragBoundary(props: {
       data-testid={`sidebar-${props.marker}`}
       className="pointer-events-none relative mx-0.5 -mb-px h-0"
     >
+      {props.restDivider && !props.visible ? <SidebarPinnedDivider /> : null}
       {props.visible ? (
         <div className="sidebar-drag-boundary-label absolute inset-x-2 top-1 flex h-4 items-center gap-2">
           <span
