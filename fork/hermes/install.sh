@@ -3,7 +3,7 @@
 #   ssh brandongomes@zeus.tail91d1cf.ts.net 'cat ~/code/t3code/fork/hermes/install.sh' | bash
 #
 # Installs t3-update into ~/.local/bin and an "Update T3 Code" app into
-# ~/Applications, schedules `t3-update check` every 30 minutes with launchd,
+# ~/Applications, schedules `t3-update check` every 5 minutes with launchd,
 # starts `t3-update watch` (updates on app quit/start), and installs the latest
 # build.
 
@@ -23,8 +23,16 @@ mv "$BIN.tmp" "$BIN"
 mkdir -p "$HOME/Applications"
 ssh -n -o BatchMode=yes "$ZEUS" 'cat ~/code/t3code/fork/hermes/update-t3.applescript' >"$HOME/.update-t3.applescript"
 rm -rf "$HOME/Applications/Update T3 Code.app"
-osacompile -o "$HOME/Applications/Update T3 Code.app" "$HOME/.update-t3.applescript"
+UPDATE_APP="$HOME/Applications/Update T3 Code.app"
+osacompile -o "$UPDATE_APP" "$HOME/.update-t3.applescript"
 rm -f "$HOME/.update-t3.applescript"
+# Handle t3fork-update:// so the sidebar's update button can launch it.
+plutil -replace CFBundleIdentifier -string com.brandon.t3fork.update-app "$UPDATE_APP/Contents/Info.plist"
+plutil -replace CFBundleURLTypes -json \
+  '[{"CFBundleURLName":"T3 fork update","CFBundleURLSchemes":["t3fork-update"]}]' \
+  "$UPDATE_APP/Contents/Info.plist"
+codesign --force --sign - "$UPDATE_APP" 2>/dev/null
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$UPDATE_APP"
 
 cat >"$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -36,7 +44,7 @@ cat >"$PLIST" <<EOF
   <array><string>$BIN</string><string>check</string></array>
   <key>EnvironmentVariables</key>
   <dict><key>T3FORK_ZEUS</key><string>$ZEUS</string></dict>
-  <key>StartInterval</key><integer>1800</integer>
+  <key>StartInterval</key><integer>300</integer>
   <key>RunAtLoad</key><true/>
   <key>StandardOutPath</key><string>$HOME/Library/Logs/t3-update.log</string>
   <key>StandardErrorPath</key><string>$HOME/Library/Logs/t3-update.log</string>
