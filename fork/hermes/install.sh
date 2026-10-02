@@ -13,7 +13,7 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 BIN="$HOME/.local/bin/t3-update"
 
 mkdir -p "$HOME/.local/bin" "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
-ssh -o BatchMode=yes "$ZEUS" 'cat ~/code/t3code/fork/hermes/t3-update' >"$BIN.tmp"
+ssh -n -o BatchMode=yes "$ZEUS" 'cat ~/code/t3code/fork/hermes/t3-update' >"$BIN.tmp"
 chmod +x "$BIN.tmp"
 mv "$BIN.tmp" "$BIN"
 

@@ -28,7 +28,7 @@ notify() { # title message
   osascript -e "display notification \"${2//\"/\\\"}\" with title \"${1//\"/\\\"}\"" >/dev/null 2>&1 || true
 }
 
-remote() { ssh -o BatchMode=yes -o ConnectTimeout=10 "$ZEUS" "$@"; }
+remote() { ssh -n -o BatchMode=yes -o ConnectTimeout=10 "$ZEUS" "$@"; }
 
 json_field() { # file field
   /usr/bin/plutil -extract "$2" raw -o - "$1" 2>/dev/null || true
