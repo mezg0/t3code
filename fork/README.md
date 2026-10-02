@@ -7,7 +7,10 @@ T3 Code Nightly; Hermes runs this fork as "T3 Code (Brandon)" and connects to Ze
 
 - `brandon` is the fork's branch: a small stack of commits on top of an upstream nightly tag.
   `origin/brandon` is the source of truth. Land changes by merging PRs into it.
-- `fork/sync.sh` runs daily at 06:00 on Zeus (`fork/zeus/install.sh` sets that up). It rebases
+- Every day at 06:00, a launchd job on Zeus (`fork/zeus/install.sh`) sends `sync` to a persistent T3
+  thread, the "upkeep thread", whose id is in `~/t3-fork-builds/upkeep-thread`. That thread
+  follows `fork/UPKEEP.md`: it runs `fork/sync.sh` and fixes conflicts or failures, and you can
+  open it any time to steer it. `fork/sync.sh` rebases
   `brandon` onto the nightly Zeus runs, keeping the same version so the client and server match. It
   then runs typecheck and the web tests, builds an ad-hoc signed arm64 app into `~/t3-fork-builds`,
   and force-pushes `brandon`. If anything fails, it keeps the last good build and records the

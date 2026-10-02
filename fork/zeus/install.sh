@@ -1,5 +1,6 @@
 #!/bin/bash
-# Run on Zeus: schedules fork/sync.sh daily at 06:00 with launchd.
+# Run on Zeus: schedules fork/zeus/nudge.sh daily at 06:00 with launchd. It
+# sends `sync` to the persistent upkeep thread, which runs fork/sync.sh.
 
 set -euo pipefail
 
@@ -15,11 +16,11 @@ cat >"$PLIST" <<EOF
 <dict>
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
-  <array><string>/bin/bash</string><string>$REPO/fork/sync.sh</string></array>
+  <array><string>/bin/bash</string><string>$REPO/fork/zeus/nudge.sh</string></array>
   <key>StartCalendarInterval</key>
   <dict><key>Hour</key><integer>6</integer><key>Minute</key><integer>0</integer></dict>
-  <key>StandardOutPath</key><string>$HOME/Library/Logs/t3fork-sync.log</string>
-  <key>StandardErrorPath</key><string>$HOME/Library/Logs/t3fork-sync.log</string>
+  <key>StandardOutPath</key><string>$HOME/Library/Logs/t3fork-nudge.log</string>
+  <key>StandardErrorPath</key><string>$HOME/Library/Logs/t3fork-nudge.log</string>
 </dict>
 </plist>
 EOF
