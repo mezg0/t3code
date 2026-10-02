@@ -49,11 +49,18 @@ staged_id() { cat "$STAGED/build" 2>/dev/null || true; }
 # match, ps gets SIGPIPE, and pipefail then reports "not running".
 app_running() { ps -axo comm= | grep -F "/$APP_NAME.app/Contents/MacOS/" >/dev/null; }
 
+# Per-process temp names: the 30-minute check and the watcher can fetch at once.
 fetch_latest() {
-  remote "cat $REMOTE_BUILDS/latest.json" >"$STATE/latest.json.tmp" || return 1
-  mv "$STATE/latest.json.tmp" "$STATE/latest.json"
-  remote "cat $REMOTE_BUILDS/status.json" >"$STATE/status.json.tmp" 2>/dev/null &&
-    mv "$STATE/status.json.tmp" "$STATE/status.json" || true
+  remote "cat $REMOTE_BUILDS/latest.json" >"$STATE/latest.json.$$.tmp" || {
+    rm -f "$STATE/latest.json.$$.tmp"
+    return 1
+  }
+  mv "$STATE/latest.json.$$.tmp" "$STATE/latest.json"
+  if remote "cat $REMOTE_BUILDS/status.json" >"$STATE/status.json.$$.tmp" 2>/dev/null; then
+    mv "$STATE/status.json.$$.tmp" "$STATE/status.json"
+  else
+    rm -f "$STATE/status.json.$$.tmp"
+  fi
 }
 
 report_failure() {
