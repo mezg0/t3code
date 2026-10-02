@@ -26,7 +26,7 @@ BRANCH="brandon"
 FORCE=0
 [[ "${1:-}" == "--force" ]] && FORCE=1
 
-export PATH="$NODE_BIN:$HOME/.cargo/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+export PATH="$NODE_BIN:$REPO/node_modules/.bin:$HOME/.cargo/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 unset GITHUB_REPOSITORY T3CODE_DESKTOP_UPDATE_REPOSITORY CSC_LINK CSC_KEY_PASSWORD
 
 mkdir -p "$BUILDS/logs" "$BUILDS/builds"

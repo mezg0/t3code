@@ -37,7 +37,9 @@ json_field() { # file field
 installed_id() { cat "$STATE/installed-build" 2>/dev/null || true; }
 staged_id() { cat "$STAGED/build" 2>/dev/null || true; }
 
-app_running() { pgrep -xq "$APP_NAME"; }
+# pgrep truncates names to 16 characters and treats the parentheses as regex,
+# so match the executable path literally.
+app_running() { ps -axo comm= | grep -qF "/$APP_NAME.app/Contents/MacOS/"; }
 
 fetch_latest() {
   remote "cat $REMOTE_BUILDS/latest.json" >"$STATE/latest.json.tmp" || return 1
