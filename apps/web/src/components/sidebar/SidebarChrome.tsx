@@ -1,4 +1,4 @@
-import { ArrowLeftIcon, ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
+import { ArrowLeftIcon, ChartNoAxesColumnIcon, RefreshCwIcon, SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { memo } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
@@ -30,6 +30,7 @@ import { SidebarProviderUpdatePill } from "./SidebarProviderUpdatePill";
 import { SidebarUpdateArchitectureWarning, SidebarUpdatePill } from "./SidebarUpdatePill";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import { observeResize } from "~/lib/observeResize";
+import { forkUpdateAction } from "~/fork/forkUpdate";
 
 export const SidebarChromeHeader = memo(function SidebarChromeHeader({
   isElectron,
@@ -188,6 +189,8 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
     void navigate({ to: "/usage" });
   };
 
+  const handleForkUpdateClick = forkUpdateAction();
+
   const handleBackClick = () => {
     closeMobileSidebar();
     void navigateToMainApp();
@@ -221,6 +224,13 @@ export const SidebarUtilityMenu = memo(function SidebarUtilityMenu() {
             label="Usage"
             onClick={handleUsageClick}
           />
+          {handleForkUpdateClick ? (
+            <SidebarUtilityItem
+              icon={<RefreshCwIcon />}
+              label="Update to latest build"
+              onClick={handleForkUpdateClick}
+            />
+          ) : null}
         </>
       )}
       <SidebarUpdatePill />
