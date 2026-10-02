@@ -266,6 +266,8 @@ const sidebarProviderEntriesAtom = Atom.make((get) => {
   return !changed && previous !== null ? previous : next;
 }).pipe(Atom.withLabel("sidebar-provider-entries"));
 
+import { useProjectFilterHotkey } from "../fork/projectFilterHotkey";
+
 const EMPTY_PROVIDER_ENTRIES: ReadonlyMap<string, SidebarProviderEntry> = new Map();
 // Collapsed shelves share one empty list so a route change alone does not
 // give the sidebar list a new identity.
@@ -1010,6 +1012,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       });
     },
   );
+  useProjectFilterHotkey(() => {
+    suppressNextScopeChangeRef.current = false;
+    dispatchProjectScopeMenu({ type: "open-changed", open: true });
+  }, projectGroups.length > 0);
   const handleProjectSettings = useStableCallback(
     (
       event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLInputElement>,
