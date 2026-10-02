@@ -17,7 +17,8 @@ T3 Code Nightly; Hermes runs this fork as "T3 Code (Brandon)" and connects to Ze
   failure in `~/t3-fork-builds/status.json`.
 - On Hermes, `t3-update check` runs every 30 minutes. It downloads new builds over SSH and installs
   them if the app is closed, or notifies you if it's open. It also notifies you about failed syncs.
-  Run `t3-update` to restart into a new build, or `t3-update rollback` to go back.
+  Click **Update T3 Code** (in `~/Applications`, so Spotlight finds it) or run `t3-update` to
+  restart into a new build, and `t3-update rollback` to go back.
 
 ## Rules for fork changes
 

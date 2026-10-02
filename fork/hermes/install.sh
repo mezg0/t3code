@@ -2,8 +2,9 @@
 # Run on Hermes:
 #   ssh brandongomes@zeus.tail91d1cf.ts.net 'cat ~/code/t3code/fork/hermes/install.sh' | bash
 #
-# Installs t3-update into ~/.local/bin, schedules `t3-update check` every 30
-# minutes with launchd, and installs the latest build.
+# Installs t3-update into ~/.local/bin and an "Update T3 Code" app into
+# ~/Applications, schedules `t3-update check` every 30 minutes with launchd,
+# and installs the latest build.
 
 set -euo pipefail
 
@@ -16,6 +17,13 @@ mkdir -p "$HOME/.local/bin" "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
 ssh -n -o BatchMode=yes "$ZEUS" 'cat ~/code/t3code/fork/hermes/t3-update' >"$BIN.tmp"
 chmod +x "$BIN.tmp"
 mv "$BIN.tmp" "$BIN"
+
+# "Update T3 Code" app for Spotlight/Dock: runs `t3-update install`.
+mkdir -p "$HOME/Applications"
+ssh -n -o BatchMode=yes "$ZEUS" 'cat ~/code/t3code/fork/hermes/update-t3.applescript' >"$HOME/.update-t3.applescript"
+rm -rf "$HOME/Applications/Update T3 Code.app"
+osacompile -o "$HOME/Applications/Update T3 Code.app" "$HOME/.update-t3.applescript"
+rm -f "$HOME/.update-t3.applescript"
 
 cat >"$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
