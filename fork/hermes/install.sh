@@ -18,7 +18,7 @@ ssh -n -o BatchMode=yes "$ZEUS" 'cat ~/code/t3code/fork/hermes/t3-update' >"$BIN
 chmod +x "$BIN.tmp"
 mv "$BIN.tmp" "$BIN"
 
-# "Update T3 Code" app for Spotlight/Dock: runs `t3-update install`.
+# "Update T3 Code" app for Spotlight/Dock: runs `t3-update install`, then opens the app.
 mkdir -p "$HOME/Applications"
 ssh -n -o BatchMode=yes "$ZEUS" 'cat ~/code/t3code/fork/hermes/update-t3.applescript' >"$HOME/.update-t3.applescript"
 rm -rf "$HOME/Applications/Update T3 Code.app"
