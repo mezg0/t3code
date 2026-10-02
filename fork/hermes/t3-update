@@ -1,0 +1,161 @@
+#!/bin/bash
+# Installs "T3 Code (Brandon)" builds published by fork/sync.sh on Zeus.
+#
+#   t3-update            Download the latest build if needed, then quit the
+#                        app, swap it in and reopen it.
+#   t3-update check      Download a new build into staging and notify (runs
+#                        from launchd). Installs straight away if the app is
+#                        not running.
+#   t3-update rollback   Restore the previously installed build.
+#   t3-update status     Show installed, staged and latest builds.
+
+set -euo pipefail
+
+ZEUS="${T3FORK_ZEUS:-brandongomes@zeus.tail91d1cf.ts.net}"
+REMOTE_BUILDS="${T3FORK_REMOTE_BUILDS:-t3-fork-builds}"
+APP_NAME="T3 Code (Brandon)"
+APP="/Applications/$APP_NAME.app"
+STATE="$HOME/Library/Application Support/t3-fork"
+STAGED="$STATE/staged"
+PREVIOUS="$STATE/previous"
+
+mkdir -p "$STATE"
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+log() { echo "[t3-update] $*"; }
+
+notify() { # title message
+  osascript -e "display notification \"${2//\"/\\\"}\" with title \"${1//\"/\\\"}\"" >/dev/null 2>&1 || true
+}
+
+remote() { ssh -o BatchMode=yes -o ConnectTimeout=10 "$ZEUS" "$@"; }
+
+json_field() { # file field
+  /usr/bin/plutil -extract "$2" raw -o - "$1" 2>/dev/null || true
+}
+
+installed_id() { cat "$STATE/installed-build" 2>/dev/null || true; }
+staged_id() { cat "$STAGED/build" 2>/dev/null || true; }
+
+app_running() { pgrep -xq "$APP_NAME"; }
+
+fetch_latest() {
+  remote "cat $REMOTE_BUILDS/latest.json" >"$STATE/latest.json.tmp" || return 1
+  mv "$STATE/latest.json.tmp" "$STATE/latest.json"
+  remote "cat $REMOTE_BUILDS/status.json" >"$STATE/status.json.tmp" 2>/dev/null &&
+    mv "$STATE/status.json.tmp" "$STATE/status.json" || true
+}
+
+report_failure() {
+  [[ -f "$STATE/status.json" ]] || return 0
+  [[ "$(json_field "$STATE/status.json" state)" == "failed" ]] || return 0
+  local at
+  at="$(json_field "$STATE/status.json" at)"
+  [[ "$at" != "$(cat "$STATE/notified-failure" 2>/dev/null || true)" ]] || return 0
+  echo "$at" >"$STATE/notified-failure"
+  notify "T3 Code (Brandon) build failed" "$(json_field "$STATE/status.json" message)"
+}
+
+stage_latest() {
+  local id zip sha tmp
+  id="$(json_field "$STATE/latest.json" buildId)"
+  [[ -n "$id" ]] || { log "No build published yet"; return 1; }
+  if [[ "$id" == "$(installed_id)" || "$id" == "$(staged_id)" ]]; then
+    return 0
+  fi
+  zip="$(json_field "$STATE/latest.json" zip)"
+  sha="$(json_field "$STATE/latest.json" sha256)"
+  log "Downloading $id"
+  tmp="$(mktemp -d "$STATE/download.XXXXXX")"
+  scp -q -o BatchMode=yes "$ZEUS:$zip" "$tmp/build.zip"
+  [[ "$(shasum -a 256 "$tmp/build.zip" | cut -d' ' -f1)" == "$sha" ]] || {
+    rm -rf "$tmp"
+    log "Checksum mismatch for $id"
+    return 1
+  }
+  ditto -x -k "$tmp/build.zip" "$tmp/app"
+  [[ -d "$tmp/app/$APP_NAME.app" ]] || { rm -rf "$tmp"; log "Zip has no $APP_NAME.app"; return 1; }
+  rm -f "$tmp/build.zip"
+  echo "$id" >"$tmp/build"
+  rm -rf "$STAGED"
+  mv "$tmp" "$STAGED"
+  log "Staged $id"
+}
+
+install_staged() {
+  local id
+  id="$(staged_id)"
+  [[ -n "$id" ]] || { log "Nothing staged"; return 0; }
+  local was_running=0
+  if app_running; then
+    was_running=1
+    log "Quitting $APP_NAME"
+    osascript -e "tell application \"$APP_NAME\" to quit" >/dev/null 2>&1 || true
+    for _ in $(seq 1 30); do app_running || break; sleep 1; done
+    app_running && { log "$APP_NAME did not quit; try again"; return 1; }
+  fi
+  rm -rf "$PREVIOUS"
+  if [[ -d "$APP" ]]; then
+    mkdir -p "$PREVIOUS"
+    mv "$APP" "$PREVIOUS/"
+    installed_id >"$PREVIOUS/build"
+  fi
+  mv "$STAGED/app/$APP_NAME.app" "$APP"
+  xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
+  echo "$id" >"$STATE/installed-build"
+  rm -rf "$STAGED"
+  log "Installed $id"
+  [[ $1 == "reopen" || $was_running -eq 1 ]] && open "$APP"
+  return 0
+}
+
+case "${1:-install}" in
+  check)
+    fetch_latest || { log "Could not reach Zeus"; exit 0; }
+    report_failure
+    stage_latest || exit 0
+    [[ -n "$(staged_id)" ]] || exit 0
+    if app_running; then
+      [[ "$(staged_id)" != "$(cat "$STATE/notified-staged" 2>/dev/null || true)" ]] && {
+        staged_id >"$STATE/notified-staged"
+        notify "T3 Code (Brandon) update ready" "Run t3-update to restart into $(staged_id)"
+      }
+    else
+      install_staged noreopen
+    fi
+    ;;
+  install)
+    fetch_latest || log "Could not reach Zeus; using any staged build"
+    stage_latest || true
+    if [[ -z "$(staged_id)" ]]; then
+      log "Already on $(installed_id)"
+      exit 0
+    fi
+    install_staged reopen
+    ;;
+  rollback)
+    [[ -d "$PREVIOUS/$APP_NAME.app" ]] || { log "No previous build"; exit 1; }
+    app_running && osascript -e "tell application \"$APP_NAME\" to quit" >/dev/null 2>&1 || true
+    for _ in $(seq 1 30); do app_running || break; sleep 1; done
+    rm -rf "$APP"
+    mv "$PREVIOUS/$APP_NAME.app" "$APP"
+    cp "$PREVIOUS/build" "$STATE/installed-build"
+    rm -rf "$PREVIOUS"
+    log "Rolled back to $(installed_id)"
+    open "$APP"
+    ;;
+  status)
+    echo "installed: $(installed_id)"
+    echo "staged:    $(staged_id)"
+    fetch_latest 2>/dev/null && {
+      echo "latest:    $(json_field "$STATE/latest.json" buildId)"
+      echo "zeus sync: $(json_field "$STATE/status.json" state) - $(json_field "$STATE/status.json" message) ($(json_field "$STATE/status.json" at))"
+      echo "changes:"
+      json_field "$STATE/latest.json" changes
+    }
+    ;;
+  *)
+    sed -n '2,12p' "$0"
+    exit 2
+    ;;
+esac
