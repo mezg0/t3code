@@ -248,6 +248,7 @@ import {
   type DraftSessionState,
 } from "../composerDraftStore";
 import { useProjectFilterHotkey } from "../fork/projectFilterHotkey";
+import { SidebarPinnedDivider } from "../fork/SidebarPinnedDivider";
 
 // Settled-tail paging: recent history is the common lookup; the deep tail
 // stays behind an explicit Show more.
@@ -592,6 +593,9 @@ function SidebarDragBoundary(props: {
   label: string;
   visible: boolean;
   isDropTarget: boolean;
+  // Fork: a divider line shown at rest. It takes no layout space, so drag
+  // measurements are unchanged; the label replaces it while dragging.
+  restDivider?: boolean;
 }) {
   return (
     <SortableSidebarMarker
@@ -599,6 +603,7 @@ function SidebarDragBoundary(props: {
       data-testid={`sidebar-${props.marker}`}
       className="pointer-events-none relative mx-0.5 -mb-px h-0"
     >
+      {props.restDivider && !props.visible ? <SidebarPinnedDivider /> : null}
       {props.visible ? (
         <div className="sidebar-drag-boundary-label absolute inset-x-2 top-1 flex h-4 items-center gap-2">
           <span
@@ -4791,6 +4796,7 @@ export default function Sidebar() {
                                 marker="pinned-divider"
                                 label="Active"
                                 visible={from !== null}
+                                restDivider={pinnedThreads.length > 0}
                                 isDropTarget={dragTargetSection === "active"}
                               />,
                             );
