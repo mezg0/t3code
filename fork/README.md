@@ -15,10 +15,11 @@ T3 Code Nightly; Hermes runs this fork as "T3 Code (Brandon)" and connects to Ze
   then runs typecheck and the web tests, builds an ad-hoc signed arm64 app into `~/t3-fork-builds`,
   and force-pushes `brandon`. If anything fails, it keeps the last good build and records the
   failure in `~/t3-fork-builds/status.json`.
-- On Hermes, `t3-update check` runs every 30 minutes and downloads new builds over SSH, installing
+- On Hermes, `t3-update check` runs every 5 minutes and downloads new builds over SSH, installing
   them straight away if the app is closed. `t3-update watch` runs all the time: it installs a
   waiting build as soon as the app quits, and when the app starts it checks Zeus and restarts it
-  into a newer build. So reopening the app is enough to update. Hermes also notifies you about
+  into a newer build. So reopening the app is enough to update, and the sidebar's
+  **Update to latest build** button (bottom left) does it on demand. Hermes also notifies you about
   failed syncs, and `t3-update rollback` goes back one build.
 
 ## Rules for fork changes

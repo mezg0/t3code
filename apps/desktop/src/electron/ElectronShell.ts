@@ -15,6 +15,8 @@ import * as Electron from "electron";
 // `zed://ssh/<host>/<path>`) must reach the OS handler; every other non-web
 // scheme stays blocked.
 const SAFE_WEB_PROTOCOLS = new Set(["http:", "https:"]);
+// Fork: the sidebar's update button opens this to launch "Update T3 Code".
+const FORK_UPDATE_URL = "t3fork-update://now";
 const REMOTE_EDITOR_PROTOCOLS = new Set(
   REMOTE_CAPABLE_EDITOR_IDS.flatMap((id) => {
     const scheme = remoteSchemeForEditor(id);
@@ -42,7 +44,9 @@ export function parseSafeExternalUrl(rawUrl: unknown): Option.Option<string> {
 
   try {
     const url = new URL(rawUrl);
-    return SAFE_WEB_PROTOCOLS.has(url.protocol) || isRemoteEditorUrl(url)
+    return SAFE_WEB_PROTOCOLS.has(url.protocol) ||
+      isRemoteEditorUrl(url) ||
+      url.href === FORK_UPDATE_URL
       ? Option.some(url.href)
       : Option.none();
   } catch {
