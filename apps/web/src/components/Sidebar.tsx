@@ -1872,7 +1872,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   }
 
   const hasRowActions = props.settlementSupported || showSnoozeButton || hasUnsentDraft;
-  const leadingStatus = !topStatus ? null : isWokeStatus ? (
+  const statusIcon = !topStatus ? null : isWokeStatus ? (
     <Tooltip>
       <TooltipTrigger
         render={
@@ -1944,16 +1944,13 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           }
         >
           {accessibleTitle}
-          {/* Fork: one line. Status (or the project icon) leads; badges sit at
-              the right and give way to the hover actions. */}
+          {/* Fork: one line. Project icon, title, then badges and the status at
+              the right edge; the hover actions take their place. */}
           <div className="relative z-10 flex h-9 min-w-0 items-center gap-1.5 px-(--sidebar-row-content-inset)">
             {draftIndicator}
-            {/* Fork: the status takes the project icon's place, so it always sits
-                at the row's left edge; rows without one show their project. */}
-            {leadingStatus ??
-              (props.project ? (
-                <ProjectFavicon project={props.project} className="size-4 shrink-0" />
-              ) : null)}
+            {props.project ? (
+              <ProjectFavicon project={props.project} className="size-4 shrink-0" />
+            ) : null}
             {title}
             {isRegeneratingTitle ? (
               <span role="status" className="sr-only">
@@ -1975,6 +1972,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 >
                   {terminalStatusIcon}
                   {prBadge}
+                  {/* Fork: status sits last, so status icons line up on the right edge
+                      and badges shift left only when a row has one. */}
+                  {isWokeStatus ? null : statusIcon}
                 </span>
                 {hasRowActions ? (
                   <span
@@ -2027,6 +2027,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                     ) : null}
                   </span>
                 ) : null}
+                {/* Woke is itself an action, so it stays beside the hover actions. */}
+                {isWokeStatus ? statusIcon : null}
               </span>
             )}
           </div>
