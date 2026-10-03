@@ -1919,8 +1919,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
       {...sortableRootProps}
       {...(fileDropHandlers ?? {})}
       className={cn(
-        // Matches the h-12 content box; the py-0.5 padding is added on top.
-        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_52px]",
+        // Matches the h-[4.875rem] content box; the py-0.5 padding is added on top.
+        "list-none py-0.5 [content-visibility:auto] [contain-intrinsic-size:auto_36px]",
         sortable?.isDragging && "relative z-20",
       )}
     >
@@ -1944,106 +1944,93 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           }
         >
           {accessibleTitle}
-          {/* Fork: two lines. Line 1 is the title with the status at the right
-              edge (the hover actions take its place); line 2 is a dim line with
-              the branch, then PR/terminal badges and the time. */}
-          <div className="relative z-10 flex h-12 min-w-0 items-center gap-2 px-(--sidebar-row-content-inset)">
+          {/* Fork: one line. Project icon, title, then badges and the status at
+              the right edge; the hover actions take their place. */}
+          <div className="relative z-10 flex h-9 min-w-0 items-center gap-1.5 px-(--sidebar-row-content-inset)">
             {draftIndicator}
             {props.project ? (
               <ProjectFavicon project={props.project} className="size-4 shrink-0" />
             ) : null}
-            <div className="flex min-w-0 flex-1 flex-col gap-px">
-              <div className="flex h-5 min-w-0 items-center gap-1.5">
-                {title}
-                {isRegeneratingTitle ? (
-                  <span role="status" className="sr-only">
-                    Regenerating title
-                  </span>
-                ) : null}
-                {sortable?.isDragging ? (
-                  dragDestination
-                ) : (
-                  <span className="group/sidebar-status-slot relative flex h-5 shrink-0 items-stretch gap-1.5 text-xs">
-                    {/* Badges and status give way to the hover actions. */}
-                    <span
-                      className={cn(
-                        "flex items-center gap-1.5 self-center text-secondary-label",
-                        hasRowActions &&
-                          "group-hover/sidebar-row:hidden group-has-[:focus-visible]/sidebar-status-slot:hidden",
-                        snoozeMenuOpen && "hidden",
-                      )}
-                    >
-                      {isWokeStatus ? null : statusIcon}
-                    </span>
-                    {hasRowActions ? (
-                      <span
-                        className={cn(
-                          "pointer-events-none absolute inset-y-0 right-0 flex items-stretch opacity-0 transition-opacity has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:static has-[:focus-visible]:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:static group-hover/sidebar-row:opacity-100",
-                          snoozeMenuOpen && "pointer-events-auto static opacity-100",
-                        )}
-                      >
-                        {hasUnsentDraft ? (
-                          <Tooltip>
-                            <TooltipTrigger
-                              render={
-                                <button
-                                  type="button"
-                                  aria-label="Discard draft"
-                                  onClick={handleDiscardDraftClick}
-                                  className="inline-flex cursor-pointer items-center rounded-md bg-transparent px-1.5 text-muted-foreground hover:text-foreground"
-                                />
-                              }
-                            >
-                              <XIcon className="size-3.5" />
-                            </TooltipTrigger>
-                            <TooltipPopup side="top">Discard draft</TooltipPopup>
-                          </Tooltip>
-                        ) : null}
-                        {showSnoozeButton ? (
-                          <SnoozeMenuButton
-                            open={snoozeMenuOpen}
-                            onOpenChange={setSnoozeMenuOpen}
-                            onSnooze={handleSnoozePreset}
-                            timestampFormat={props.timestampFormat}
-                          />
-                        ) : null}
-                        {props.settlementSupported ? (
-                          <Tooltip>
-                            <TooltipTrigger
-                              render={
-                                <button
-                                  type="button"
-                                  aria-label="Settle thread"
-                                  onClick={handleSettleClick}
-                                  className="inline-flex cursor-pointer items-center rounded-md bg-transparent px-1.5 text-muted-foreground hover:text-foreground"
-                                />
-                              }
-                            >
-                              <CheckIcon className="size-3.5" />
-                            </TooltipTrigger>
-                            <TooltipPopup>Settle thread</TooltipPopup>
-                          </Tooltip>
-                        ) : null}
-                      </span>
-                    ) : null}
-                    {/* Woke is itself an action, so it stays beside the hover actions. */}
-                    {isWokeStatus ? statusIcon : null}
-                  </span>
-                )}
-              </div>
-              <div className="flex h-4 min-w-0 items-center gap-1.5 text-xs text-muted-foreground/70">
-                <span className="min-w-0 flex-1 truncate">
-                  {thread.branch ?? props.projectDisplayName ?? "No project"}
-                </span>
-                <span className="flex shrink-0 items-center gap-1.5 text-secondary-label">
+            {title}
+            {isRegeneratingTitle ? (
+              <span role="status" className="sr-only">
+                Regenerating title
+              </span>
+            ) : null}
+            {sortable?.isDragging ? (
+              dragDestination
+            ) : (
+              <span className="group/sidebar-status-slot relative flex h-5 shrink-0 items-stretch gap-1.5 text-xs">
+                {/* Badges and status give way to the hover actions. */}
+                <span
+                  className={cn(
+                    "flex items-center gap-1.5 self-center text-secondary-label",
+                    hasRowActions &&
+                      "group-hover/sidebar-row:hidden group-has-[:focus-visible]/sidebar-status-slot:hidden",
+                    snoozeMenuOpen && "hidden",
+                  )}
+                >
                   {terminalStatusIcon}
                   {prBadge}
-                  <span className="text-muted-foreground/70 tabular-nums">
-                    {threadTimeLabel(thread)}
-                  </span>
+                  {/* Fork: status sits last, so status icons line up on the right edge
+                      and badges shift left only when a row has one. */}
+                  {isWokeStatus ? null : statusIcon}
                 </span>
-              </div>
-            </div>
+                {hasRowActions ? (
+                  <span
+                    className={cn(
+                      "pointer-events-none absolute inset-y-0 right-0 flex items-stretch opacity-0 transition-opacity has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:static has-[:focus-visible]:opacity-100 group-hover/sidebar-row:pointer-events-auto group-hover/sidebar-row:static group-hover/sidebar-row:opacity-100",
+                      snoozeMenuOpen && "pointer-events-auto static opacity-100",
+                    )}
+                  >
+                    {hasUnsentDraft ? (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              type="button"
+                              aria-label="Discard draft"
+                              onClick={handleDiscardDraftClick}
+                              className="inline-flex cursor-pointer items-center rounded-md bg-transparent px-1.5 text-muted-foreground hover:text-foreground"
+                            />
+                          }
+                        >
+                          <XIcon className="size-3.5" />
+                        </TooltipTrigger>
+                        <TooltipPopup side="top">Discard draft</TooltipPopup>
+                      </Tooltip>
+                    ) : null}
+                    {showSnoozeButton ? (
+                      <SnoozeMenuButton
+                        open={snoozeMenuOpen}
+                        onOpenChange={setSnoozeMenuOpen}
+                        onSnooze={handleSnoozePreset}
+                        timestampFormat={props.timestampFormat}
+                      />
+                    ) : null}
+                    {props.settlementSupported ? (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <button
+                              type="button"
+                              aria-label="Settle thread"
+                              onClick={handleSettleClick}
+                              className="inline-flex cursor-pointer items-center rounded-md bg-transparent px-1.5 text-muted-foreground hover:text-foreground"
+                            />
+                          }
+                        >
+                          <CheckIcon className="size-3.5" />
+                        </TooltipTrigger>
+                        <TooltipPopup>Settle thread</TooltipPopup>
+                      </Tooltip>
+                    ) : null}
+                  </span>
+                ) : null}
+                {/* Woke is itself an action, so it stays beside the hover actions. */}
+                {isWokeStatus ? statusIcon : null}
+              </span>
+            )}
           </div>
           {props.jumpLabel ? <JumpHintBadge label={props.jumpLabel} /> : null}
         </TooltipTrigger>
