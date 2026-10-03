@@ -70,6 +70,7 @@ import {
   CircleDashedIcon,
   ClockIcon,
   EyeIcon,
+  FileDiffIcon,
   FolderIcon,
   GitBranchIcon,
   MessageCircleQuestionIcon,
@@ -448,6 +449,7 @@ function SidebarThreadTooltip({
     .filter((instanceId) => instanceId !== modelInstanceId)
     .map((instanceId) => providerEntryByInstanceId.get(instanceId)?.displayName ?? instanceId);
   const supportsMultiplePullRequests = useSupportsMultiplePullRequests(thread.environmentId);
+  const diff = latestRunDiff(thread);
   return (
     <ThreadHoverCardPopup side="right" align="start" sideOffset={4}>
       <ThreadHoverCard
@@ -479,6 +481,16 @@ function SidebarThreadTooltip({
           <div className="flex min-w-0 items-center gap-2">
             <GitBranchIcon className="size-3 shrink-0 stroke-muted-foreground" />
             <MiddleTruncate value={thread.branch} className="flex" />
+          </div>
+        ) : null}
+        {/* Fork: the row no longer shows the diff, so it lives here. */}
+        {diff ? (
+          <div className="flex min-w-0 items-center gap-2">
+            <FileDiffIcon className="size-3 shrink-0 stroke-muted-foreground" />
+            <span className="font-mono">
+              <span className="text-diff-addition-foreground">+{diff.insertions}</span>{" "}
+              <span className="text-diff-deletion-foreground">−{diff.deletions}</span>
+            </span>
           </div>
         ) : null}
         {branchMismatch ? (
@@ -1935,7 +1947,47 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     );
   }
 
-  const diff = latestRunDiff(thread);
+  const hasRowActions = props.settlementSupported || showSnoozeButton || hasUnsentDraft;
+  const leadingStatus = !topStatus ? null : isWokeStatus ? (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            aria-label="Dismiss Woke notification"
+            onClick={handleAcknowledgeWokeClick}
+            className={cn(
+              "inline-flex shrink-0 cursor-pointer items-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              topStatus.className,
+            )}
+          >
+            <AlarmClockIcon aria-hidden className="size-4 shrink-0" />
+            <span role="status" className="sr-only">
+              {topStatus.label}
+            </span>
+          </button>
+        }
+      />
+      <TooltipPopup side="top">Dismiss Woke notification</TooltipPopup>
+    </Tooltip>
+  ) : topStatus.icon ? (
+    <span className={cn("inline-flex shrink-0 items-center", topStatus.className)}>
+      {topStatus.icon === "working" ? (
+        <CircleDashedIcon aria-hidden className="size-4 shrink-0" />
+      ) : topStatus.icon === "input" ? (
+        <MessageCircleQuestionIcon aria-hidden className="size-4 shrink-0" />
+      ) : topStatus.icon === "approval" ? (
+        <ShieldQuestionIcon aria-hidden className="size-4 shrink-0" />
+      ) : topStatus.icon === "failed" ? (
+        <CircleAlertIcon aria-hidden className="size-4 shrink-0" />
+      ) : (
+        <CircleCheckIcon aria-hidden className="size-4 shrink-0" />
+      )}
+      <span role="status" className="sr-only">
+        {topStatus.label}
+      </span>
+    </span>
+  ) : null;
 
   return (
     <li
@@ -1968,14 +2020,16 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           }
         >
           {accessibleTitle}
-          {/* Fork: one line. Status (or the hover actions) sits before the
-              badges, so showing the actions only shortens the title and the
-              badges stay pinned to the right edge. */}
+          {/* Fork: one line. Status (or the project icon) leads; badges sit at
+              the right and give way to the hover actions. */}
           <div className="relative z-10 flex h-9 min-w-0 items-center gap-1.5 px-(--sidebar-row-content-inset)">
             {draftIndicator}
-            {props.project ? (
-              <ProjectFavicon project={props.project} className="size-4 shrink-0" />
-            ) : null}
+            {/* Fork: the status takes the project icon's place, so it always sits
+                at the row's left edge; rows without one show their project. */}
+            {leadingStatus ??
+              (props.project ? (
+                <ProjectFavicon project={props.project} className="size-4 shrink-0" />
+              ) : null)}
             {title}
             {isRegeneratingTitle ? (
               <span role="status" className="sr-only">
@@ -1987,63 +2041,23 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
             ) : (
               <span
                 className={cn(
-                  "group/sidebar-status-slot relative flex h-5 shrink-0 items-stretch justify-end text-xs",
+                  "group/sidebar-status-slot relative flex h-5 shrink-0 items-stretch gap-1.5 text-xs",
                   props.sweepAction !== null && "hidden",
                 )}
               >
+                {/* Badges and status give way to the hover actions. */}
                 <span
                   className={cn(
-                    isWokeStatus
-                      ? "pointer-events-auto"
-                      : "pointer-events-none group-has-[:focus-visible]/sidebar-status-slot:absolute group-has-[:focus-visible]/sidebar-status-slot:right-0 group-has-[:focus-visible]/sidebar-status-slot:opacity-0 group-any-hover/sidebar-row:absolute group-any-hover/sidebar-row:right-0 group-any-hover/sidebar-row:opacity-0",
-                    "flex items-center self-center text-secondary-label transition-opacity",
-                    snoozeMenuOpen && "pointer-events-none absolute right-0 opacity-0",
+                    "flex items-center gap-1.5 self-center text-secondary-label",
+                    hasRowActions &&
+                      "group-any-hover/sidebar-row:hidden group-has-[:focus-visible]/sidebar-status-slot:hidden",
+                    snoozeMenuOpen && "hidden",
                   )}
                 >
-                  {topStatus ? (
-                    isWokeStatus ? (
-                      <Tooltip>
-                        <TooltipTrigger
-                          render={
-                            <button
-                              type="button"
-                              aria-label="Dismiss Woke notification"
-                              onClick={handleAcknowledgeWokeClick}
-                              className={cn(
-                                "inline-flex cursor-pointer items-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                topStatus.className,
-                              )}
-                            >
-                              <AlarmClockIcon aria-hidden className="size-4 shrink-0" />
-                              <span role="status" className="sr-only">
-                                {topStatus.label}
-                              </span>
-                            </button>
-                          }
-                        />
-                        <TooltipPopup side="top">Dismiss Woke notification</TooltipPopup>
-                      </Tooltip>
-                    ) : (
-                      <span className={cn("inline-flex items-center", topStatus.className)}>
-                        {topStatus.icon === "working" ? (
-                          <CircleDashedIcon aria-hidden className="size-4 shrink-0" />
-                        ) : topStatus.icon === "input" ? (
-                          <MessageCircleQuestionIcon aria-hidden className="size-4 shrink-0" />
-                        ) : topStatus.icon === "approval" ? (
-                          <ShieldQuestionIcon aria-hidden className="size-4 shrink-0" />
-                        ) : topStatus.icon === "failed" ? (
-                          <CircleAlertIcon aria-hidden className="size-4 shrink-0" />
-                        ) : topStatus.icon === "done" ? (
-                          <CircleCheckIcon aria-hidden className="size-4 shrink-0" />
-                        ) : null}
-                        <span role="status" className="sr-only">
-                          {topStatus.label}
-                        </span>
-                      </span>
-                    )
-                  ) : null}
+                  {terminalStatusIcon}
+                  {prBadge}
                 </span>
-                {props.settlementSupported || showSnoozeButton || hasUnsentDraft ? (
+                {hasRowActions ? (
                   <span
                     className={cn(
                       "pointer-events-none absolute inset-y-0 right-0 flex items-stretch opacity-0 transition-opacity has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:static has-[:focus-visible]:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:static group-any-hover/sidebar-row:opacity-100",
@@ -2101,16 +2115,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 pressed action button stays connected and a cancelled sweep's
                 release click still fires and is consumed. */}
             {props.sweepAction !== null ? dragDestination : null}
-            <span className="flex shrink-0 items-center gap-1.5 text-secondary-label text-xs">
-              {terminalStatusIcon}
-              {prBadge}
-              {diff ? (
-                <span className="shrink-0 font-mono">
-                  <span className="text-diff-addition-foreground">+{diff.insertions}</span>{" "}
-                  <span className="text-diff-deletion-foreground">−{diff.deletions}</span>
-                </span>
-              ) : null}
-            </span>
           </div>
           {props.jumpLabel ? <JumpHintBadge label={props.jumpLabel} /> : null}
         </TooltipTrigger>
