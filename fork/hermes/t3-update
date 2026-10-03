@@ -3,9 +3,9 @@
 #
 #   t3-update            Download the latest build if needed, then quit the
 #                        app, swap it in and reopen it.
-#   t3-update check      Download a new build into staging and notify (runs
-#                        from launchd). Installs straight away if the app is
-#                        not running.
+#   t3-update check      Download a new build into staging (runs from
+#                        launchd). Installs straight away if the app is not
+#                        running.
 #   t3-update watch      Runs under launchd: installs a staged build as soon as
 #                        the app quits, and when the app starts, checks Zeus
 #                        and restarts it into a newer build if one is ready
@@ -168,14 +168,8 @@ case "${1:-install}" in
     report_failure
     stage_latest || exit 0
     [[ -n "$(staged_id)" ]] || exit 0
-    if app_running; then
-      [[ "$(staged_id)" != "$(cat "$STATE/notified-staged" 2>/dev/null || true)" ]] && {
-        staged_id >"$STATE/notified-staged"
-        notify "T3 Code (Brandon) update ready" "Quit and reopen the app to update to $(staged_id)"
-      }
-    else
-      install_staged noreopen
-    fi
+    # A running app picks the staged build up when it next quits or starts.
+    app_running || install_staged noreopen
     ;;
   install)
     fetch_latest || log "Could not reach Zeus; using any staged build"
