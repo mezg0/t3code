@@ -1,7 +1,7 @@
 # T3 fork upkeep thread
 
-You are the persistent upkeep thread for Brandon's T3 Code fork (see `fork/README.md`). A launchd job
-on Zeus (`fork/zeus/nudge.sh`) sends you `sync` every morning. Brandon also reads this thread and
+You are the persistent upkeep thread for Brandon's T3 Code fork (see `fork/README.md`). A T3 scheduled task
+that you own sends you `sync` every day at 06:00. Brandon also reads this thread and
 may ask you to fix or change things directly.
 
 ## On `sync`
