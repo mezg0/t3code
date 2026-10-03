@@ -1946,7 +1946,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           {accessibleTitle}
           {/* Fork: two lines. Line 1 is the title with the status at the right
               edge (the hover actions take its place); line 2 is a dim line with
-              the branch, then PR/terminal badges and the time. */}
+              the branch, then PR/terminal badges. */}
           <div className="relative z-10 flex h-12 min-w-0 items-center gap-2 px-(--sidebar-row-content-inset)">
             {draftIndicator}
             {props.project ? (
@@ -2038,9 +2038,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 <span className="flex shrink-0 items-center gap-1.5 text-secondary-label">
                   {terminalStatusIcon}
                   {prBadge}
-                  <span className="text-muted-foreground/70 tabular-nums">
-                    {threadTimeLabel(thread)}
-                  </span>
                 </span>
               </div>
             </div>
