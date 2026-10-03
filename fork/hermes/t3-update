@@ -73,7 +73,9 @@ report_failure() {
   notify "T3 Code (Brandon) build failed" "$(json_field "$STATE/status.json" message)"
 }
 
-stage_latest() {
+stage_latest() { with_lock stage_latest_locked; }
+
+stage_latest_locked() {
   local id zip sha tmp
   id="$(json_field "$STATE/latest.json" buildId)"
   [[ -n "$id" ]] || { log "No build published yet"; return 1; }
@@ -84,13 +86,13 @@ stage_latest() {
   sha="$(json_field "$STATE/latest.json" sha256)"
   log "Downloading $id"
   tmp="$(mktemp -d "$STATE/download.XXXXXX")"
-  scp -q -o BatchMode=yes "$ZEUS:$zip" "$tmp/build.zip"
+  scp -q -o BatchMode=yes "$ZEUS:$zip" "$tmp/build.zip" || { rm -rf "$tmp"; log "Download failed for $id"; return 1; }
   [[ "$(shasum -a 256 "$tmp/build.zip" | cut -d' ' -f1)" == "$sha" ]] || {
     rm -rf "$tmp"
     log "Checksum mismatch for $id"
     return 1
   }
-  ditto -x -k "$tmp/build.zip" "$tmp/app"
+  ditto -x -k "$tmp/build.zip" "$tmp/app" || { rm -rf "$tmp"; log "Could not unpack $id"; return 1; }
   [[ -d "$tmp/app/$APP_NAME.app" ]] || { rm -rf "$tmp"; log "Zip has no $APP_NAME.app"; return 1; }
   rm -f "$tmp/build.zip"
   echo "$id" >"$tmp/build"
@@ -99,10 +101,40 @@ stage_latest() {
   log "Staged $id"
 }
 
-install_staged() {
+# The watcher, the 30-minute check and the sidebar button can all stage or
+# install at once. Without this lock, a second install moved the freshly
+# installed app aside and then found nothing staged, leaving no app at all.
+with_lock() { # command...
+  local lock="$STATE/update.lock" pid rc=0
+  for _ in $(seq 1 300); do
+    if mkdir "$lock" 2>/dev/null; then
+      echo $$ >"$lock/pid"
+      "$@" || rc=$?
+      rm -rf "$lock"
+      return $rc
+    fi
+    pid="$(cat "$lock/pid" 2>/dev/null || true)"
+    if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then
+      rm -rf "$lock"
+      continue
+    fi
+    sleep 1
+  done
+  log "Another update is still running"
+  return 1
+}
+
+install_staged() { with_lock install_staged_locked "$@"; }
+
+install_staged_locked() {
   local id
   id="$(staged_id)"
   [[ -n "$id" ]] || { log "Nothing staged"; return 0; }
+  [[ -d "$STAGED/app/$APP_NAME.app" ]] || {
+    log "Staged $id has no app; discarding it"
+    rm -rf "$STAGED"
+    return 1
+  }
   local was_running=0
   if app_running; then
     was_running=1
@@ -114,10 +146,14 @@ install_staged() {
   rm -rf "$PREVIOUS"
   if [[ -d "$APP" ]]; then
     mkdir -p "$PREVIOUS"
-    mv "$APP" "$PREVIOUS/"
+    mv "$APP" "$PREVIOUS/" || { log "Could not move the current app aside"; return 1; }
     installed_id >"$PREVIOUS/build"
   fi
-  mv "$STAGED/app/$APP_NAME.app" "$APP"
+  if ! mv "$STAGED/app/$APP_NAME.app" "$APP"; then
+    log "Could not install $id; restoring the previous build"
+    [[ -d "$PREVIOUS/$APP_NAME.app" && ! -e "$APP" ]] && mv "$PREVIOUS/$APP_NAME.app" "$APP"
+    return 1
+  fi
   xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
   echo "$id" >"$STATE/installed-build"
   rm -rf "$STAGED"
