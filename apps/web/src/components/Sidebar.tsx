@@ -47,7 +47,7 @@ import {
   type ThreadId,
 } from "@t3tools/contracts";
 
-import { FolderIcon, ListFilterIcon, PlusIcon, SettingsIcon } from "lucide-react";
+import { FolderIcon, LayersIcon, ListFilterIcon, PlusIcon, SettingsIcon } from "lucide-react";
 import {
   useEffect,
   useLayoutEffect,
@@ -267,6 +267,12 @@ const sidebarProviderEntriesAtom = Atom.make((get) => {
 }).pipe(Atom.withLabel("sidebar-provider-entries"));
 
 import { useProjectFilterHotkey } from "../fork/projectFilterHotkey";
+import { projectGroupScopeKey, useProjectGroupsStore } from "../fork/projectGroups";
+import {
+  NewProjectGroupButton,
+  ProjectGroupDialogHost,
+  ProjectGroupScopeItemContent,
+} from "../fork/ProjectGroupsMenu";
 
 const EMPTY_PROVIDER_ENTRIES: ReadonlyMap<string, SidebarProviderEntry> = new Map();
 // Collapsed shelves share one empty list so a route change alone does not
@@ -696,8 +702,17 @@ function useSidebarLookups() {
   const projectGroupByScopeKey = new Map(
     projectGroups.map((project) => [project.projectKey, project] as const),
   );
+  // Fork: saved project groups sit above projects in the filter menu.
+  const savedProjectGroups = useProjectGroupsStore((state) => state.groups);
+  const savedProjectGroupByScopeKey = new Map(
+    savedProjectGroups.map((group) => [projectGroupScopeKey(group.id), group] as const),
+  );
   const projectScopeItems = [
     { value: "all", label: "All projects" },
+    ...savedProjectGroups.map((group) => ({
+      value: projectGroupScopeKey(group.id),
+      label: group.name,
+    })),
     ...projectGroups.map((project) => ({ value: project.projectKey, label: project.displayName })),
   ];
   return {
@@ -710,6 +725,7 @@ function useSidebarLookups() {
     projectDisplayNameByKey,
     projectGroupByScopeKey,
     projectScopeItems,
+    savedProjectGroupByScopeKey,
   };
 }
 
@@ -759,6 +775,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     projectDisplayNameByKey,
     projectGroupByScopeKey,
     projectScopeItems,
+    savedProjectGroupByScopeKey,
   } = useSidebarLookups();
   const router = useRouter();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -945,15 +962,28 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     projectScopeKey === null
       ? null
       : (projectGroups.find((project) => project.projectKey === projectScopeKey) ?? null);
+  // Fork: a saved project group can be the scope too.
+  const scopedSavedGroup =
+    projectScopeKey === null ? null : (savedProjectGroupByScopeKey.get(projectScopeKey) ?? null);
   const scopedProjectKeys =
-    scopedProjectGroup === null
-      ? null
-      : new Set(
-          scopedProjectGroup.memberProjectRefs.map(
-            (projectRef) => `${projectRef.environmentId}:${projectRef.projectId}`,
-          ),
-        );
+    scopedSavedGroup !== null
+      ? new Set(scopedSavedGroup.memberKeys)
+      : scopedProjectGroup === null
+        ? null
+        : new Set(
+            scopedProjectGroup.memberProjectRefs.map(
+              (projectRef) => `${projectRef.environmentId}:${projectRef.projectId}`,
+            ),
+          );
   useEffect(() => {
+    // Fork: a saved project group's key is not a project group; keep it
+    // while the group exists.
+    if (
+      persistedProjectScopeKey !== null &&
+      savedProjectGroupByScopeKey.has(persistedProjectScopeKey)
+    ) {
+      return;
+    }
     const nextKey = resolveSidebarProjectScopeKey({
       groups: projectGroups,
       key: persistedProjectScopeKey,
@@ -971,6 +1001,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     persistedProjectScopeKey,
     projectGroups,
     projectGroupingSettings,
+    savedProjectGroupByScopeKey,
     setPersistedProjectScopeKey,
   ]);
   const routeDraftIdForRows = routeTarget?.kind === "draft" ? routeTarget.draftId : null;
@@ -2672,14 +2703,20 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     render={
                       <SidebarHeaderIconButton
                         label={
-                          scopedProjectGroup
-                            ? `Filter threads by project: ${scopedProjectGroup.displayName}`
-                            : "Filter threads by project"
+                          scopedSavedGroup
+                            ? `Filter threads by project: ${scopedSavedGroup.name}`
+                            : scopedProjectGroup
+                              ? `Filter threads by project: ${scopedProjectGroup.displayName}`
+                              : "Filter threads by project"
                         }
                       />
                     }
                   >
-                    {scopedProjectGroup ? (
+                    {scopedSavedGroup ? (
+                      <LayersIcon className="size-4" />
+                    ) : scopedProjectGroup ? (
+                      // Wrapped so the button's direct-child svg color rule cannot override
+                      // a project's own icon color.
                       <span className="flex shrink-0">
                         <ProjectFavicon project={scopedProjectGroup} className="size-4" />
                       </span>
@@ -2721,6 +2758,14 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     <ComboboxEmpty>No matching projects.</ComboboxEmpty>
                     <ComboboxList>
                       {(item: (typeof projectScopeItems)[number]) => {
+                        const savedGroup = savedProjectGroupByScopeKey.get(item.value);
+                        if (savedGroup) {
+                          return (
+                            <ComboboxItem key={item.value} hideIndicator value={item}>
+                              <ProjectGroupScopeItemContent group={savedGroup} />
+                            </ComboboxItem>
+                          );
+                        }
                         const project = projectGroupByScopeKey.get(item.value) ?? null;
                         return (
                           <ComboboxItem
@@ -2764,6 +2809,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         );
                       }}
                     </ComboboxList>
+                    <NewProjectGroupButton
+                      onOpen={() => dispatchProjectScopeMenu({ type: "open-changed", open: false })}
+                    />
                   </ComboboxPopup>
                 </Combobox>
               }
@@ -2789,6 +2837,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         }
       >
         <SidebarGroup className="flex-1" role="presentation">
+          <ProjectGroupDialogHost projects={projectGroups} />
           {isSearchingThreads ? (
             threadSearchResults.length > 0 ? (
               <TooltipProvider
@@ -3175,6 +3224,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     Add project
                   </button>
                 </>
+              ) : scopedSavedGroup ? (
+                `No threads in ${scopedSavedGroup.name} yet`
               ) : scopedProjectGroup ? (
                 `No threads in ${scopedProjectGroup.displayName} yet`
               ) : (

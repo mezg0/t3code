@@ -186,6 +186,10 @@ Recorded so nobody re-litigates them:
   each kind of work gets its own clone of the repo as its own project, and the project filter
   switches between them. Nesting launched threads under their launcher was built and removed: the
   server records no parent, so the client had to guess it from each thread's first message.
+  Clones of one repo merge into one project in the sidebar unless that project's grouping is set
+  to separate.
+- **Project groups** are named sets of projects at the top of the project filter ("New group…"
+  creates one; the pencil edits or deletes it). They're stored per device, like the filter itself.
 - The "No project" icon is a project setting (Project settings → Project icon), not code. Brandon
   chose `message-circle` in gray.
 
