@@ -1,3 +1,4 @@
+import type { ProjectIconOverride } from "@t3tools/contracts";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -14,6 +15,8 @@ export interface SavedProjectGroup {
   readonly id: string;
   readonly name: string;
   readonly memberKeys: readonly string[];
+  /** Chosen like a project's icon; groups without one show a stack of layers. */
+  readonly icon?: ProjectIconOverride | null;
 }
 
 const SCOPE_PREFIX = "fork-group:";
