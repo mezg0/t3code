@@ -287,6 +287,7 @@ import { useProjectFilterHotkey } from "../fork/projectFilterHotkey";
 import { SidebarPinnedDivider } from "../fork/SidebarPinnedDivider";
 import { groupLaunchedThreads, useLaunchParentStore } from "../fork/launchParents";
 import {
+  LaunchedThreadArrow,
   LaunchedThreadsChip,
   LaunchParentResolver,
   SidebarLaunchedChildren,
@@ -1186,6 +1187,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   launchedNeedsAttention: boolean;
   launchedExpanded: boolean;
   onToggleLaunched: (threadKey: string) => void;
+  // Fork: a launched thread shows an arrow in its launcher's project-icon column.
+  launchedChild?: boolean;
 }) {
   const {
     isRenaming,
@@ -1844,7 +1847,11 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                   "opacity-40 grayscale group-focus-within/sidebar-row:opacity-100 group-focus-within/sidebar-row:grayscale-0 group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0",
               )}
             >
-              {props.project ? <ProjectFavicon project={props.project} className="size-4" /> : null}
+              {props.launchedChild ? (
+                <LaunchedThreadArrow />
+              ) : props.project ? (
+                <ProjectFavicon project={props.project} className="size-4" />
+              ) : null}
             </span>
             {draftIndicator}
             {title}
@@ -2045,7 +2052,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
               the right edge; the hover actions take their place. */}
           <div className="relative z-10 flex h-9 min-w-0 items-center gap-1.5 px-(--sidebar-row-content-inset)">
             {draftIndicator}
-            {props.project ? (
+            {props.launchedChild ? (
+              <LaunchedThreadArrow />
+            ) : props.project ? (
               <ProjectFavicon project={props.project} className="size-4 shrink-0" />
             ) : null}
             {title}
@@ -5224,6 +5233,7 @@ export default function Sidebar() {
                         thread: EnvironmentThreadShell,
                         section: SidebarSection,
                         sortable?: SortableThreadRowBag,
+                        launchedChild = false,
                       ) => {
                         const threadKey = scopedThreadKey(
                           scopeThreadRef(thread.environmentId, thread.id),
@@ -5348,6 +5358,7 @@ export default function Sidebar() {
                               isLaunchedGroupExpanded(threadKey, launchedChildren)
                             }
                             onToggleLaunched={toggleLaunchedThreads}
+                            launchedChild={launchedChild}
                           />
                         );
                       };
@@ -5413,7 +5424,7 @@ export default function Sidebar() {
                                       child.settledOverride === "settled",
                                     pinned: child.pinnedAt != null,
                                   });
-                                  return renderThreadRowInner(child, childSection);
+                                  return renderThreadRowInner(child, childSection, undefined, true);
                                 }}
                               />,
                             );

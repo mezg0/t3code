@@ -128,27 +128,19 @@ export function LaunchedThreadsChip(props: {
   );
 }
 
-/** A launcher's expanded children, each behind an arrow. */
+/** Takes the project icon's slot in a launched thread's row, under its launcher's icon. */
+export function LaunchedThreadArrow() {
+  return <CornerDownRightIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />;
+}
+
+/** A launcher's expanded children; each row draws its own arrow. */
 export function SidebarLaunchedChildren(props: {
   threads: readonly EnvironmentThreadShell[];
   renderRow: (thread: EnvironmentThreadShell) => ReactNode;
 }) {
   return (
     <li className="list-none" data-thread-selection-safe>
-      <ul className="flex flex-col gap-px">
-        {props.threads.map((thread) => (
-          <li
-            key={scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id))}
-            className="relative list-none pl-5"
-          >
-            <CornerDownRightIcon
-              aria-hidden
-              className="pointer-events-none absolute top-3 left-1.5 size-3 text-muted-foreground"
-            />
-            <ul>{props.renderRow(thread)}</ul>
-          </li>
-        ))}
-      </ul>
+      <ul className="flex flex-col gap-px">{props.threads.map(props.renderRow)}</ul>
     </li>
   );
 }
