@@ -47,7 +47,7 @@ import {
   type ThreadId,
 } from "@t3tools/contracts";
 
-import { FolderIcon, LayersIcon, ListFilterIcon, PlusIcon, SettingsIcon } from "lucide-react";
+import { FolderIcon, ListFilterIcon, PlusIcon, SettingsIcon } from "lucide-react";
 import {
   useEffect,
   useLayoutEffect,
@@ -271,6 +271,7 @@ import { projectGroupScopeKey, useProjectGroupsStore } from "../fork/projectGrou
 import {
   NewProjectGroupButton,
   ProjectGroupDialogHost,
+  ProjectGroupIcon,
   ProjectGroupScopeItemContent,
 } from "../fork/ProjectGroupsMenu";
 
@@ -2713,7 +2714,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                     }
                   >
                     {scopedSavedGroup ? (
-                      <LayersIcon className="size-4" />
+                      // Same wrapper as a project icon, so the group's own color shows.
+                      <span className="flex shrink-0">
+                        <ProjectGroupIcon icon={scopedSavedGroup.icon} className="size-4" />
+                      </span>
                     ) : scopedProjectGroup ? (
                       // Wrapped so the button's direct-child svg color rule cannot override
                       // a project's own icon color.
