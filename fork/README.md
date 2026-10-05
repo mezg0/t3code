@@ -49,8 +49,8 @@ server's version: every build is based on the exact Nightly tag Zeus runs.
      into `brandon` on `origin`.
    - **Fast-forward** (small fixes Brandon has already approved):
      `cd ~/code/t3code && git merge --ff-only fork/<topic> && git push origin brandon`.
-   Fetch first and rebase your branch if `brandon` has moved; other threads land on it too.
-   Never force-push `brandon` yourself; only `sync.sh`'s rebase does that.
+     Fetch first and rebase your branch if `brandon` has moved; other threads land on it too.
+     Never force-push `brandon` yourself; only `sync.sh`'s rebase does that.
 5. Ship it (next section), then remove the worktree and branch.
 
 To undo a shipped change, `git revert` it on `brandon` rather than rewriting history.
@@ -182,9 +182,10 @@ Recorded so nobody re-litigates them:
   Putting the status in the project icon's slot was tried and rejected because it hid the project.
 - Hover swaps the badges and status for Snooze and Settle; a Woke alarm stays visible, and clicking
   it dismisses it. The diff count and machine icon live in the hover tooltip, not the row.
-- Threads that an agent launched (`t3_thread_launch` or `create_threads`) nest under the launching
-  thread behind a `↳ N` chip. The server records no parent, so the client reads the sender of each
-  thread's first message; threads imported from V1 are skipped.
+- Agent fan-outs (a coordinator launching a worker thread per issue) are organised by **project**:
+  each kind of work gets its own clone of the repo as its own project, and the project filter
+  switches between them. Nesting launched threads under their launcher was built and removed: the
+  server records no parent, so the client had to guess it from each thread's first message.
 - The "No project" icon is a project setting (Project settings → Project icon), not code. Brandon
   chose `message-circle` in gray.
 

@@ -285,13 +285,6 @@ import {
 } from "../composerDraftStore";
 import { useProjectFilterHotkey } from "../fork/projectFilterHotkey";
 import { SidebarPinnedDivider } from "../fork/SidebarPinnedDivider";
-import { groupLaunchedThreads, useLaunchParentStore } from "../fork/launchParents";
-import {
-  LaunchedThreadArrow,
-  LaunchedThreadsChip,
-  LaunchParentResolver,
-  SidebarLaunchedChildren,
-} from "../fork/LaunchedThreads";
 
 // Settled-tail paging: recent history is the common lookup; the deep tail
 // stays behind an explicit Show more.
@@ -1182,13 +1175,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     threadKey: string,
     snapshot: ThreadChangeRequestSnapshot | null,
   ) => void;
-  // Fork: threads this one launched. A zero count hides the chip.
-  launchedCount: number;
-  launchedNeedsAttention: boolean;
-  launchedExpanded: boolean;
-  onToggleLaunched: (threadKey: string) => void;
-  // Fork: a launched thread shows an arrow in its launcher's project-icon column.
-  launchedChild?: boolean;
 }) {
   const {
     isRenaming,
@@ -1656,15 +1642,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     isActive: props.isActive,
   });
 
-  const launchedChip =
-    props.launchedCount > 0 ? (
-      <LaunchedThreadsChip
-        count={props.launchedCount}
-        needsAttention={props.launchedNeedsAttention}
-        expanded={props.launchedExpanded}
-        onToggle={() => props.onToggleLaunched(threadKey)}
-      />
-    ) : null;
   const title =
     isRenaming && canOperateThread ? (
       <input
@@ -1847,15 +1824,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                   "opacity-40 grayscale group-focus-within/sidebar-row:opacity-100 group-focus-within/sidebar-row:grayscale-0 group-hover/sidebar-row:opacity-100 group-hover/sidebar-row:grayscale-0",
               )}
             >
-              {props.launchedChild ? (
-                <LaunchedThreadArrow />
-              ) : props.project ? (
-                <ProjectFavicon project={props.project} className="size-4" />
-              ) : null}
+              {props.project ? <ProjectFavicon project={props.project} className="size-4" /> : null}
             </span>
             {draftIndicator}
             {title}
-            {launchedChip}
             {pinIndicator}
             {terminalStatusIcon}
             {isRegeneratingTitle ? (
@@ -2052,13 +2024,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
               the right edge; the hover actions take their place. */}
           <div className="relative z-10 flex h-9 min-w-0 items-center gap-1.5 px-(--sidebar-row-content-inset)">
             {draftIndicator}
-            {props.launchedChild ? (
-              <LaunchedThreadArrow />
-            ) : props.project ? (
+            {props.project ? (
               <ProjectFavicon project={props.project} className="size-4 shrink-0" />
             ) : null}
             {title}
-            {launchedChip}
             {isRegeneratingTitle ? (
               <span role="status" className="sr-only">
                 Regenerating title
@@ -2706,14 +2675,6 @@ export default function Sidebar() {
         override holds until all of them appear in canonical state. */
     readonly assignedKeys: ReadonlyMap<string, string>;
   } | null>(null);
-  const launchParentByThreadKey = useLaunchParentStore((state) => state.parentByThreadKey);
-  const expandedLaunchParentKeys = useLaunchParentStore((state) => state.expandedParentKeys);
-  const toggleLaunchedThreads = useLaunchParentStore((state) => state.toggleExpanded);
-  // Every project, not just the filtered ones, so switching filters needs no lookups.
-  const launchCandidateThreads = useMemo(
-    () => filterSidebarV2VisibleThreads(threads, null),
-    [threads],
-  );
   const {
     pinnedThreads,
     draggableThreadKeys,
@@ -2722,7 +2683,6 @@ export default function Sidebar() {
     workingThreads,
     snoozedThreads,
     settledThreads,
-    launchedChildrenByKey,
     snoozeNow,
   } = useMemo(() => {
     // Snooze classification uses a REAL clock, not the quantized minute:
@@ -2733,14 +2693,7 @@ export default function Sidebar() {
     const preciseNow = new Date().toISOString();
     // Subagent child threads live in the parent's Agents surface, not the
     // sidebar roster (v2 models them as real threads with lineage).
-    // Fork: agent-launched threads follow their launcher's row instead of
-    // taking a shelf of their own.
-    const launched = groupLaunchedThreads(
-      filterSidebarV2VisibleThreads(threads, scopedProjectKeys),
-      (thread) => scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
-      launchParentByThreadKey,
-    );
-    const visible = launched.roots;
+    const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys);
     inboxReturns.observe(workingShelfEnabled ? threads : null);
     const pinned: EnvironmentThreadShell[] = [];
     const active: EnvironmentThreadShell[] = [];
@@ -2838,11 +2791,9 @@ export default function Sidebar() {
           firstValidTimestampMs(right.snoozedUntil ?? null),
       ),
       settledThreads: sortSettledThreads(settled),
-      launchedChildrenByKey: launched.childrenByParentKey,
       snoozeNow: preciseNow,
     };
   }, [
-    launchParentByThreadKey,
     nowMinute,
     optimisticDrop,
     scopedProjectKeys,
@@ -2863,16 +2814,8 @@ export default function Sidebar() {
       ...workingThreads,
       ...snoozedThreads,
       ...settledThreads,
-      ...[...launchedChildrenByKey.values()].flat(),
     ],
-    [
-      activeThreads,
-      launchedChildrenByKey,
-      pinnedThreads,
-      settledThreads,
-      snoozedThreads,
-      workingThreads,
-    ],
+    [activeThreads, pinnedThreads, settledThreads, snoozedThreads, workingThreads],
   );
   const searchEnvironmentIds = useConnectedEnvironmentIds();
   // useThreadSearch owns the debounce and the two-character floor.
@@ -5111,7 +5054,6 @@ export default function Sidebar() {
         }
       >
         <SidebarGroup className="flex-1" role="presentation">
-          <LaunchParentResolver threads={launchCandidateThreads} />
           {isSearchingThreads ? (
             threadSearchResults.length > 0 ? (
               <TooltipProvider
@@ -5218,22 +5160,10 @@ export default function Sidebar() {
                     )}
                   >
                     {(() => {
-                      // A group holding the open thread stays expanded.
-                      const isLaunchedGroupExpanded = (
-                        threadKey: string,
-                        children: readonly EnvironmentThreadShell[],
-                      ) =>
-                        expandedLaunchParentKeys[threadKey] === true ||
-                        children.some(
-                          (child) =>
-                            scopedThreadKey(scopeThreadRef(child.environmentId, child.id)) ===
-                            routeThreadKey,
-                        );
                       const renderThreadRowInner = (
                         thread: EnvironmentThreadShell,
                         section: SidebarSection,
                         sortable?: SortableThreadRowBag,
-                        launchedChild = false,
                       ) => {
                         const threadKey = scopedThreadKey(
                           scopeThreadRef(thread.environmentId, thread.id),
@@ -5243,7 +5173,6 @@ export default function Sidebar() {
                         // from users (or the auto rules) actually parking work,
                         // not from the sidebar second-guessing what still matters.
                         // Working rows stay cards so their live status shows.
-                        const launchedChildren = launchedChildrenByKey.get(threadKey);
                         const isCard =
                           section === "active" || section === "pinned" || section === "working";
                         const rowVariant = isCard ? "card" : "slim";
@@ -5347,18 +5276,6 @@ export default function Sidebar() {
                               changeRequestSnapshotByKey.get(threadKey) ?? null
                             }
                             onChangeRequestSnapshot={setThreadChangeRequestSnapshot}
-                            launchedCount={launchedChildren?.length ?? 0}
-                            launchedNeedsAttention={
-                              launchedChildren?.some(
-                                (child) => child.hasPendingApprovals || child.hasPendingUserInput,
-                              ) ?? false
-                            }
-                            launchedExpanded={
-                              launchedChildren !== undefined &&
-                              isLaunchedGroupExpanded(threadKey, launchedChildren)
-                            }
-                            onToggleLaunched={toggleLaunchedThreads}
-                            launchedChild={launchedChild}
                           />
                         );
                       };
@@ -5401,34 +5318,6 @@ export default function Sidebar() {
                       for (const item of sidebarListItems) {
                         if (item.kind === "thread") {
                           items.push(renderThreadRow(threadByKey.get(item.key)!, item.section));
-                          const launchedChildren = launchedChildrenByKey.get(item.key);
-                          if (
-                            launchedChildren !== undefined &&
-                            isLaunchedGroupExpanded(item.key, launchedChildren)
-                          ) {
-                            items.push(
-                              <SidebarLaunchedChildren
-                                key={`${item.key}:launched`}
-                                threads={launchedChildren}
-                                renderRow={(child) => {
-                                  const capabilities = serverConfigs.get(child.environmentId)
-                                    ?.environment.capabilities;
-                                  // A child keeps its own lifecycle actions while it
-                                  // sits under its launcher.
-                                  const childSection = resolveSidebarThreadSection({
-                                    snoozed:
-                                      capabilities?.threadSnooze === true &&
-                                      effectiveSnoozed(child, { now: snoozeNow }),
-                                    settled:
-                                      capabilities?.threadSettlement === true &&
-                                      child.settledOverride === "settled",
-                                    pinned: child.pinnedAt != null,
-                                  });
-                                  return renderThreadRowInner(child, childSection, undefined, true);
-                                }}
-                              />,
-                            );
-                          }
                           continue;
                         }
                         switch (item.marker) {
