@@ -78,7 +78,6 @@ import {
   FolderIcon,
   GitBranchIcon,
   ListFilterIcon,
-  LayersIcon,
   MessageCircleQuestionIcon,
   PinIcon,
   PinOffIcon,
@@ -299,6 +298,7 @@ import { projectGroupScopeKey, useProjectGroupsStore } from "../fork/projectGrou
 import {
   NewProjectGroupButton,
   ProjectGroupDialogHost,
+  ProjectGroupIcon,
   ProjectGroupScopeItemContent,
 } from "../fork/ProjectGroupsMenu";
 
@@ -5043,7 +5043,10 @@ export default function Sidebar() {
                     }
                   >
                     {scopedSavedGroup ? (
-                      <LayersIcon className="size-4" />
+                      // Same wrapper as a project icon, so the group's own color shows.
+                      <span className="flex shrink-0">
+                        <ProjectGroupIcon icon={scopedSavedGroup.icon} className="size-4" />
+                      </span>
                     ) : scopedProjectGroup ? (
                       // Wrapped so the button's direct-child svg color rule cannot override
                       // a project's own icon color.

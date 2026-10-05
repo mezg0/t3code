@@ -1,9 +1,12 @@
-import type { ScopedProjectRef } from "@t3tools/contracts";
+import type { ProjectIconOverride, ScopedProjectRef } from "@t3tools/contracts";
 import { LayersIcon, PencilIcon, PlusIcon } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { DynamicIcon, type IconName } from "lucide-react/dynamic";
+import { Suspense, useId, useMemo, useState } from "react";
 import { create } from "zustand";
 
 import { ProjectFavicon, type ProjectFaviconProject } from "../components/ProjectFavicon";
+import { ProjectMonogram } from "../components/ProjectMonogram";
+import { ProjectIconPickerDialog } from "../components/settings/ProjectIconPickerDialog";
 import { Button } from "../components/ui/button";
 import { Checkbox } from "../components/ui/checkbox";
 import {
@@ -17,7 +20,8 @@ import {
 } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { randomUUID } from "../lib/utils";
+import { cn, randomUUID } from "../lib/utils";
+import { projectIconColorClassName } from "../projectIconColors";
 import {
   projectEntryMembership,
   setProjectEntryMembership,
@@ -34,6 +38,44 @@ export type ProjectGroupEntry = ProjectFaviconProject & {
 
 export function projectEntryKeys(entry: Pick<ProjectGroupEntry, "memberProjectRefs">): string[] {
   return entry.memberProjectRefs.map((ref) => `${ref.environmentId}:${ref.projectId}`);
+}
+
+/** A group's chosen icon, drawn like a project's; a stack of layers when none is set. */
+export function ProjectGroupIcon(props: {
+  icon: ProjectIconOverride | null | undefined;
+  className?: string;
+}) {
+  const { icon, className } = props;
+  if (icon?.kind === "monogram") {
+    return <ProjectMonogram text={icon.text} color={icon.color} className={className} />;
+  }
+  if (icon?.kind === "emoji") {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn(
+          "inline-flex shrink-0 items-center justify-center leading-none [container-type:size]",
+          className,
+        )}
+      >
+        <span className="text-[length:80cqh] leading-none">{icon.emoji}</span>
+      </span>
+    );
+  }
+  if (icon?.kind === "lucide") {
+    const colorClassName = projectIconColorClassName(icon.color);
+    const fallback = <LayersIcon className={cn("shrink-0", colorClassName, className)} />;
+    return (
+      <Suspense fallback={fallback}>
+        <DynamicIcon
+          name={icon.name as IconName}
+          className={cn("shrink-0", colorClassName, className)}
+          fallback={() => fallback}
+        />
+      </Suspense>
+    );
+  }
+  return <LayersIcon className={cn("shrink-0", className)} />;
 }
 
 // null while closed; "new" or the group being edited while open.
@@ -68,6 +110,8 @@ function ProjectGroupDialog(props: {
   const deleteGroup = useProjectGroupsStore((state) => state.deleteGroup);
   const [name, setName] = useState(props.group?.name ?? "");
   const [memberKeys, setMemberKeys] = useState<readonly string[]>(props.group?.memberKeys ?? []);
+  const [icon, setIcon] = useState(props.group?.icon ?? null);
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const members = useMemo(() => new Set(memberKeys), [memberKeys]);
   const canSave = name.trim().length > 0 && memberKeys.length > 0;
   return (
@@ -87,6 +131,7 @@ function ProjectGroupDialog(props: {
               id: props.group?.id ?? randomUUID(),
               name: name.trim(),
               memberKeys,
+              icon,
             });
             closeDialog();
           }}
@@ -107,6 +152,37 @@ function ProjectGroupDialog(props: {
                   onChange={(event) => setName(event.target.value)}
                 />
               </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">Icon</span>
+                <div className="flex items-center gap-1">
+                  {icon ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost-muted"
+                      onClick={() => setIcon(null)}
+                    >
+                      Use default
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIconPickerOpen(true)}
+                  >
+                    <ProjectGroupIcon icon={icon} className="size-4" />
+                    Change
+                  </Button>
+                </div>
+              </div>
+              <ProjectIconPickerDialog
+                current={icon}
+                projectName={name.trim() || "Group"}
+                open={iconPickerOpen}
+                onOpenChange={setIconPickerOpen}
+                onSelect={setIcon}
+              />
               <div className="flex flex-col gap-1.5">
                 <span className="text-sm font-medium">Projects</span>
                 <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
@@ -166,7 +242,7 @@ function ProjectGroupDialog(props: {
 export function ProjectGroupScopeItemContent(props: { group: SavedProjectGroup }) {
   return (
     <>
-      <LayersIcon className="size-4 shrink-0" />
+      <ProjectGroupIcon icon={props.group.icon} className="size-4" />
       <span className="min-w-0 flex-1 truncate text-sm">{props.group.name}</span>
       <Button
         size="icon-xs"
