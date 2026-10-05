@@ -17,11 +17,16 @@ import { resolveStorage } from "../lib/storage";
  * Top-level threads a user did not create: the only ones with a launcher to
  * find. Launches are not reliably stamped `agent`/`mcp` (many arrive as
  * `system`/`server`), so the first message's sender is the real signal.
+ * Threads imported from V1 are skipped: V1 never recorded a sender.
  */
 export function isLaunchedThreadCandidate(
   thread: Pick<EnvironmentThreadShell, "lineage" | "source">,
 ): boolean {
-  return thread.source.createdBy !== "user" && thread.lineage.parentThreadId === null;
+  return (
+    thread.source.createdBy !== "user" &&
+    thread.source.historyOrigin !== "v1_import" &&
+    thread.lineage.parentThreadId === null
+  );
 }
 
 // A launch writes its first message as it creates the thread.

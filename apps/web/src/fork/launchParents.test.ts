@@ -107,14 +107,18 @@ describe("launchSenderThreadId", () => {
 });
 
 describe("isLaunchedThreadCandidate", () => {
-  const shell = (createdBy: "user" | "agent" | "system", parentThreadId: string | null) =>
+  const shell = (
+    createdBy: "user" | "agent" | "system",
+    parentThreadId: string | null,
+    historyOrigin?: "native" | "v1_import",
+  ) =>
     ({
       lineage: {
         parentThreadId: parentThreadId === null ? null : ThreadId.make(parentThreadId),
         relationshipToParent: parentThreadId === null ? null : "subagent",
         rootThreadId: ThreadId.make("root"),
       },
-      source: { createdBy },
+      source: { createdBy, historyOrigin },
     }) as Parameters<typeof isLaunchedThreadCandidate>[0];
 
   it("looks up top-level threads an agent or the server created", () => {
@@ -125,5 +129,9 @@ describe("isLaunchedThreadCandidate", () => {
   it("skips user-created threads and threads that already have a parent", () => {
     expect(isLaunchedThreadCandidate(shell("user", null))).toBe(false);
     expect(isLaunchedThreadCandidate(shell("agent", "parent"))).toBe(false);
+  });
+
+  it("skips threads imported from V1, which never recorded a sender", () => {
+    expect(isLaunchedThreadCandidate(shell("system", null, "v1_import"))).toBe(false);
   });
 });

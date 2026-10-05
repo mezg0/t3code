@@ -14,7 +14,7 @@ import {
   useLaunchParentStore,
 } from "./launchParents";
 
-// Each lookup fetches a whole thread projection, so only a few run at once.
+// Each lookup fetches a thread's recent history window, so only a few run at once.
 const MAX_CONCURRENT_LOOKUPS = 3;
 
 /** Finds the launchers of agent-launched threads in the background. Renders nothing. */
@@ -94,22 +94,16 @@ function LaunchParentLookup(props: {
  */
 export function LaunchedThreadsChip(props: {
   count: number;
-  workingCount: number;
-  attentionCount: number;
+  /** A launched thread is waiting on an approval or an answer. */
+  needsAttention: boolean;
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const label = [
-    `${props.count} launched ${props.count === 1 ? "thread" : "threads"}`,
-    props.attentionCount > 0 ? `${props.attentionCount} need you` : null,
-    props.workingCount > 0 ? `${props.workingCount} working` : null,
-  ]
-    .filter((part) => part !== null)
-    .join(", ");
+  const label = `${props.count} launched ${props.count === 1 ? "thread" : "threads"}`;
   return (
     <button
       type="button"
-      aria-label={`${props.expanded ? "Hide" : "Show"} ${label}`}
+      aria-label={`${props.expanded ? "Hide" : "Show"} ${label}${props.needsAttention ? ", needs you" : ""}`}
       aria-expanded={props.expanded}
       // The row picks up drags, opens on click, and activates on Enter.
       onPointerDown={(event) => event.stopPropagation()}
@@ -121,7 +115,7 @@ export function LaunchedThreadsChip(props: {
       }}
       className={cn(
         "inline-flex h-5 shrink-0 cursor-pointer items-center gap-0.5 rounded-md px-1 text-xs tabular-nums hover:bg-sidebar-row-hover",
-        props.attentionCount > 0
+        props.needsAttention
           ? "text-warning-foreground"
           : props.expanded
             ? "text-foreground"
