@@ -78,6 +78,7 @@ import {
   FolderIcon,
   GitBranchIcon,
   ListFilterIcon,
+  LayersIcon,
   MessageCircleQuestionIcon,
   PinIcon,
   PinOffIcon,
@@ -294,6 +295,12 @@ import {
 } from "../composerDraftStore";
 import { useProjectFilterHotkey } from "../fork/projectFilterHotkey";
 import { SidebarPinnedDivider } from "../fork/SidebarPinnedDivider";
+import { projectGroupScopeKey, useProjectGroupsStore } from "../fork/projectGroups";
+import {
+  NewProjectGroupButton,
+  ProjectGroupDialogHost,
+  ProjectGroupScopeItemContent,
+} from "../fork/ProjectGroupsMenu";
 
 // Settled-tail paging: recent history is the common lookup; the deep tail
 // stays behind an explicit Show more.
@@ -2542,17 +2549,27 @@ export default function Sidebar() {
       }),
     [persistedProjectScopeKey, projectGroups, projectGroupingSettings],
   );
+  // Fork: saved project groups sit above projects in the filter menu.
+  const savedProjectGroups = useProjectGroupsStore((state) => state.groups);
+  const savedProjectGroupByScopeKey = useMemo(
+    () => new Map(savedProjectGroups.map((group) => [projectGroupScopeKey(group.id), group])),
+    [savedProjectGroups],
+  );
   // {value, label} items let Base UI drive the combobox selection contract
   // while the popup search filters the same collection.
   const projectScopeItems = useMemo(
     () => [
       { value: "all", label: "All projects" },
+      ...savedProjectGroups.map((group) => ({
+        value: projectGroupScopeKey(group.id),
+        label: group.name,
+      })),
       ...projectGroups.map((project) => ({
         value: project.projectKey,
         label: project.displayName,
       })),
     ],
-    [projectGroups],
+    [projectGroups, savedProjectGroups],
   );
   // Same-named projects on two machines are only told apart by where they
   // live, so rows on another machine carry its icon once the catalog spans
@@ -2613,22 +2630,35 @@ export default function Sidebar() {
         : (projectGroups.find((project) => project.projectKey === projectScopeKey) ?? null),
     [projectGroups, projectScopeKey],
   );
+  // Fork: a saved project group can be the scope too.
+  const scopedSavedGroup =
+    projectScopeKey === null ? null : (savedProjectGroupByScopeKey.get(projectScopeKey) ?? null);
   const scopedProjectKeys = useMemo(
     () =>
-      scopedProjectGroup === null
-        ? null
-        : new Set(
-            scopedProjectGroup.memberProjectRefs.map(
-              (projectRef) => `${projectRef.environmentId}:${projectRef.projectId}`,
+      scopedSavedGroup !== null
+        ? new Set(scopedSavedGroup.memberKeys)
+        : scopedProjectGroup === null
+          ? null
+          : new Set(
+              scopedProjectGroup.memberProjectRefs.map(
+                (projectRef) => `${projectRef.environmentId}:${projectRef.projectId}`,
+              ),
             ),
-          ),
-    [scopedProjectGroup],
+    [scopedProjectGroup, scopedSavedGroup],
   );
   // Configs identify scratch projects, so both they and live project snapshots
   // must arrive before a persisted scope can be considered missing.
   const allProjectSnapshotsReady = useAllEnvironmentProjectSnapshotsReady();
   const allProjectConfigsReady = useAtomValue(environmentProjects.projectConfigsReadyAtom);
   useEffect(() => {
+    // Fork: a saved project group's key is not a project group; keep it
+    // while the group exists.
+    if (
+      persistedProjectScopeKey !== null &&
+      savedProjectGroupByScopeKey.has(persistedProjectScopeKey)
+    ) {
+      return;
+    }
     const nextKey = resolveSidebarProjectScopeKey({
       groups: projectGroups,
       key: persistedProjectScopeKey,
@@ -2644,6 +2674,7 @@ export default function Sidebar() {
     persistedProjectScopeKey,
     projectGroups,
     projectGroupingSettings,
+    savedProjectGroupByScopeKey,
     setProjectScopeKey,
   ]);
   // Count-only subscription: the parent needs "are there draft rows" for the
@@ -5002,14 +5033,18 @@ export default function Sidebar() {
                     render={
                       <SidebarHeaderIconButton
                         label={
-                          scopedProjectGroup
-                            ? `Filter threads by project: ${scopedProjectGroup.displayName}`
-                            : "Filter threads by project"
+                          scopedSavedGroup
+                            ? `Filter threads by project: ${scopedSavedGroup.name}`
+                            : scopedProjectGroup
+                              ? `Filter threads by project: ${scopedProjectGroup.displayName}`
+                              : "Filter threads by project"
                         }
                       />
                     }
                   >
-                    {scopedProjectGroup ? (
+                    {scopedSavedGroup ? (
+                      <LayersIcon className="size-4" />
+                    ) : scopedProjectGroup ? (
                       // Wrapped so the button's direct-child svg color rule cannot override
                       // a project's own icon color.
                       <span className="flex shrink-0">
@@ -5059,6 +5094,14 @@ export default function Sidebar() {
                     <ComboboxEmpty>No matching projects.</ComboboxEmpty>
                     <ComboboxList>
                       {(item: (typeof projectScopeItems)[number]) => {
+                        const savedGroup = savedProjectGroupByScopeKey.get(item.value);
+                        if (savedGroup) {
+                          return (
+                            <ComboboxItem key={item.value} hideIndicator value={item}>
+                              <ProjectGroupScopeItemContent group={savedGroup} />
+                            </ComboboxItem>
+                          );
+                        }
                         const project = projectGroupByScopeKey.get(item.value) ?? null;
                         return (
                           <ComboboxItem
@@ -5102,6 +5145,9 @@ export default function Sidebar() {
                         );
                       }}
                     </ComboboxList>
+                    <NewProjectGroupButton
+                      onOpen={() => dispatchProjectScopeMenu({ type: "open-changed", open: false })}
+                    />
                   </ComboboxPopup>
                 </Combobox>
               }
@@ -5127,6 +5173,7 @@ export default function Sidebar() {
         }
       >
         <SidebarGroup className="flex-1" role="presentation">
+          <ProjectGroupDialogHost projects={projectGroups} />
           {isSearchingThreads ? (
             threadSearchResults.length > 0 ? (
               <TooltipProvider
@@ -5554,6 +5601,8 @@ export default function Sidebar() {
                     Add project
                   </button>
                 </>
+              ) : scopedSavedGroup ? (
+                `No threads in ${scopedSavedGroup.name} yet`
               ) : scopedProjectGroup ? (
                 `No threads in ${scopedProjectGroup.displayName} yet`
               ) : (
