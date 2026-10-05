@@ -1192,8 +1192,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   ) => void;
   // Fork: threads this one launched. A zero count hides the chip.
   launchedCount: number;
-  launchedWorkingCount: number;
-  launchedAttentionCount: number;
+  launchedNeedsAttention: boolean;
   launchedExpanded: boolean;
   onToggleLaunched: (threadKey: string) => void;
 }) {
@@ -1667,8 +1666,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     props.launchedCount > 0 ? (
       <LaunchedThreadsChip
         count={props.launchedCount}
-        workingCount={props.launchedWorkingCount}
-        attentionCount={props.launchedAttentionCount}
+        needsAttention={props.launchedNeedsAttention}
         expanded={props.launchedExpanded}
         onToggle={() => props.onToggleLaunched(threadKey)}
       />
@@ -5414,14 +5412,10 @@ export default function Sidebar() {
                             }
                             onChangeRequestSnapshot={setThreadChangeRequestSnapshot}
                             launchedCount={launchedChildren?.length ?? 0}
-                            launchedWorkingCount={
-                              launchedChildren?.filter((child) => isSidebarThreadWorking(child))
-                                .length ?? 0
-                            }
-                            launchedAttentionCount={
-                              launchedChildren?.filter(
+                            launchedNeedsAttention={
+                              launchedChildren?.some(
                                 (child) => child.hasPendingApprovals || child.hasPendingUserInput,
-                              ).length ?? 0
+                              ) ?? false
                             }
                             launchedExpanded={
                               launchedChildren !== undefined &&
