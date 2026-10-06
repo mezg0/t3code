@@ -49,6 +49,7 @@ import * as Option from "effect/Option";
 import {
   ArrowLeftIcon,
   ChartNoAxesColumnIcon,
+  LayoutDashboardIcon,
   CheckIcon,
   ChevronRightIcon,
   CornerLeftUpIcon,
@@ -2246,6 +2247,18 @@ function OpenCommandPaletteDialog(props: {
       },
     });
   }
+
+  // Fork: the Overview page.
+  actionItems.push({
+    kind: "action",
+    value: "action:overview",
+    searchTerms: ["overview", "dashboard", "home", "status", "agents", "groups"],
+    title: "Open overview",
+    icon: <LayoutDashboardIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/overview" });
+    },
+  });
 
   actionItems.push({
     kind: "action",

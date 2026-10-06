@@ -190,6 +190,11 @@ Recorded so nobody re-litigates them:
   to separate.
 - **Project groups** are named sets of projects at the top of the project filter ("New group…"
   creates one; the pencil edits or deletes it). They're stored per device, like the filter itself.
+- The **Overview** page (`/overview`; sidebar footer grid button, or "Open overview" in the command
+  palette) shows a card per project group with working / needs-you / active thread counts, and the
+  open pull requests waiting for Brandon's review or authored by him. Clicking a card filters the
+  sidebar. Site health checks were discussed: the client can't read other sites' status (CORS), so
+  they'd come from an uptime service's status feed, not built yet.
 - The "No project" icon is a project setting (Project settings → Project icon), not code. Brandon
   chose `message-circle` in gray.
 
