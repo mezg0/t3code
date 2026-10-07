@@ -190,6 +190,8 @@ Recorded so nobody re-litigates them:
   to separate.
 - **Project groups** are named sets of projects at the top of the project filter ("New group…"
   creates one; the pencil edits or deletes it). They're stored per device, like the filter itself.
+- An Overview page (group cards with thread counts, plus open pull requests) was built and removed,
+  and a triage-inbox version was mocked up and dropped. Don't rebuild one without asking Brandon.
 - The "No project" icon is a project setting (Project settings → Project icon), not code. Brandon
   chose `message-circle` in gray.
 
