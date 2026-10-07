@@ -286,6 +286,7 @@ import {
 import { useProjectFilterHotkey } from "../fork/projectFilterHotkey";
 import { SidebarPinnedDivider } from "../fork/SidebarPinnedDivider";
 import { projectGroupScopeKey, useProjectGroupsStore } from "../fork/projectGroups";
+import { projectGroupHotkeyLabel, useProjectGroupHotkeys } from "../fork/projectGroupHotkeys";
 import {
   NewProjectGroupButton,
   ProjectGroupDialogHost,
@@ -2511,6 +2512,11 @@ export default function Sidebar() {
   const savedProjectGroupByScopeKey = useMemo(
     () => new Map(savedProjectGroups.map((group) => [projectGroupScopeKey(group.id), group])),
     [savedProjectGroups],
+  );
+  // Fork: Ctrl+1–9 picks a group, Ctrl+0 shows all projects.
+  useProjectGroupHotkeys(
+    savedProjectGroups.map((group) => group.id),
+    (groupId) => setProjectScopeKey(groupId === null ? null : projectGroupScopeKey(groupId)),
   );
   // {value, label} items let Base UI drive the combobox selection contract
   // while the popup search filters the same collection.
@@ -5030,7 +5036,13 @@ export default function Sidebar() {
                         if (savedGroup) {
                           return (
                             <ComboboxItem key={item.value} hideIndicator value={item}>
-                              <ProjectGroupScopeItemContent group={savedGroup} />
+                              <ProjectGroupScopeItemContent
+                                group={savedGroup}
+                                shortcut={projectGroupHotkeyLabel(
+                                  savedProjectGroups.indexOf(savedGroup),
+                                  isMacPlatform(navigator.platform),
+                                )}
+                              />
                             </ComboboxItem>
                           );
                         }

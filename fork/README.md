@@ -190,6 +190,8 @@ Recorded so nobody re-litigates them:
   to separate.
 - **Project groups** are named sets of projects at the top of the project filter ("New group…"
   creates one; the pencil edits or deletes it). They're stored per device, like the filter itself.
+  Ctrl+1–9 on macOS (Alt+1–9 elsewhere; Ctrl/Cmd+digit jumps to threads) picks group 1–9 and
+  Ctrl+0 shows all projects. Cmd+Ctrl+digit was tried and rejected as awkward.
 - An Overview page (group cards with thread counts, plus open pull requests) was built and removed,
   and a triage-inbox version was mocked up and dropped. Don't rebuild one without asking Brandon.
 - The "No project" icon is a project setting (Project settings → Project icon), not code. Brandon
