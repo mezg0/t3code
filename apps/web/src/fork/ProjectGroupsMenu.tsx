@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { Input } from "../components/ui/input";
+import { Kbd } from "../components/ui/kbd";
 import { Label } from "../components/ui/label";
 import { cn, randomUUID } from "../lib/utils";
 import { projectIconColorClassName } from "../projectIconColors";
@@ -239,11 +240,16 @@ function ProjectGroupDialog(props: {
 }
 
 /** A group's row in the sidebar's project filter, with a button to edit it. */
-export function ProjectGroupScopeItemContent(props: { group: SavedProjectGroup }) {
+export function ProjectGroupScopeItemContent(props: {
+  group: SavedProjectGroup;
+  /** Its jump shortcut, for the first nine groups. */
+  shortcut: string | null;
+}) {
   return (
     <>
       <ProjectGroupIcon icon={props.group.icon} className="size-4" />
       <span className="min-w-0 flex-1 truncate text-sm">{props.group.name}</span>
+      {props.shortcut ? <Kbd>{props.shortcut}</Kbd> : null}
       <Button
         size="icon-xs"
         variant="ghost-muted"

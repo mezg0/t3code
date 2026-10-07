@@ -268,6 +268,7 @@ const sidebarProviderEntriesAtom = Atom.make((get) => {
 
 import { useProjectFilterHotkey } from "../fork/projectFilterHotkey";
 import { projectGroupScopeKey, useProjectGroupsStore } from "../fork/projectGroups";
+import { projectGroupHotkeyLabel, useProjectGroupHotkeys } from "../fork/projectGroupHotkeys";
 import {
   NewProjectGroupButton,
   ProjectGroupDialogHost,
@@ -726,6 +727,7 @@ function useSidebarLookups() {
     projectDisplayNameByKey,
     projectGroupByScopeKey,
     projectScopeItems,
+    savedProjectGroups,
     savedProjectGroupByScopeKey,
   };
 }
@@ -776,6 +778,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     projectDisplayNameByKey,
     projectGroupByScopeKey,
     projectScopeItems,
+    savedProjectGroups,
     savedProjectGroupByScopeKey,
   } = useSidebarLookups();
   const router = useRouter();
@@ -931,6 +934,11 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     clearSelection();
     setPersistedProjectScopeKey(key);
   };
+  // Fork: Ctrl+1–9 picks a group, Ctrl+0 shows all projects.
+  useProjectGroupHotkeys(
+    savedProjectGroups.map((group) => group.id),
+    (groupId) => setProjectScopeKey(groupId === null ? null : projectGroupScopeKey(groupId)),
+  );
   const projectScopeKey = resolveSidebarProjectScopeKey({
     groups: projectGroups,
     key: persistedProjectScopeKey,
@@ -2766,7 +2774,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                         if (savedGroup) {
                           return (
                             <ComboboxItem key={item.value} hideIndicator value={item}>
-                              <ProjectGroupScopeItemContent group={savedGroup} />
+                              <ProjectGroupScopeItemContent
+                                group={savedGroup}
+                                shortcut={projectGroupHotkeyLabel(
+                                  savedProjectGroups.indexOf(savedGroup),
+                                  isMacPlatform(navigator.platform),
+                                )}
+                              />
                             </ComboboxItem>
                           );
                         }
