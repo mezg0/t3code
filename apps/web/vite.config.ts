@@ -84,7 +84,8 @@ const unitTestProject = {
     // run, those async tests can exceed Vitest's default 5s budget.
     hookTimeout: 15_000,
     testTimeout: 15_000,
-    setupFiles: ["../../packages/shared/src/testing/longTempDir.ts"],
+    // Fork: no longTempDir setup. It only acts on Windows, and its node:sea
+    // import (via hostProcess) can't be bundled for jsdom tests.
   },
 } satisfies TestProjectInlineConfiguration;
 
