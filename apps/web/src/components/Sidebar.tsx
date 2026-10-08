@@ -1955,7 +1955,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
     );
   }
 
-  const hasRowActions = props.settlementSupported || showSnoozeButton || hasUnsentDraft;
   const statusIcon = !topStatus ? null : isWokeStatus ? (
     <Tooltip>
       <TooltipTrigger
@@ -2054,7 +2053,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 <span
                   className={cn(
                     "flex items-center gap-1.5 self-center text-secondary-label",
-                    hasRowActions &&
+                    showHoverActions &&
                       "group-any-hover/sidebar-row:hidden group-has-[:focus-visible]/sidebar-status-slot:hidden",
                     snoozeMenuOpen && "hidden",
                   )}
@@ -2065,7 +2064,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                       and badges shift left only when a row has one. */}
                   {isWokeStatus ? null : statusIcon}
                 </span>
-                {hasRowActions ? (
+                {showHoverActions ? (
                   <span
                     className={cn(
                       "pointer-events-none absolute inset-y-0 right-0 flex items-stretch opacity-0 transition-opacity has-[:focus-visible]:pointer-events-auto has-[:focus-visible]:static has-[:focus-visible]:opacity-100 group-any-hover/sidebar-row:pointer-events-auto group-any-hover/sidebar-row:static group-any-hover/sidebar-row:opacity-100",
@@ -2097,7 +2096,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                         timestampFormat={props.timestampFormat}
                       />
                     ) : null}
-                    {props.settlementSupported ? (
+                    {canOperateThread && props.settlementSupported ? (
                       <Tooltip>
                         <TooltipTrigger
                           render={
