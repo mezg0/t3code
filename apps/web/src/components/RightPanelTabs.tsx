@@ -24,6 +24,7 @@ import {
   Globe2,
   Plus,
   TerminalSquare,
+  TagIcon,
 } from "lucide-react";
 import { Volume2, VolumeOff } from "lucide";
 import {
@@ -128,6 +129,8 @@ interface RightPanelTabsProps {
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddDevice: () => void;
+  /** Fork: the tagged-threads tab; only threads have one. */
+  onAddTaggedThreads?: (() => void) | undefined;
   browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
@@ -163,6 +166,7 @@ const SURFACE_DISABLED_REASONS = {
   pullRequest: "This thread's branch has no pull request yet.",
   pullRequests: "No linked pull requests are available for this thread.",
   device: "Devices are only available from a thread.",
+  taggedThreads: "Available from a thread.",
 } as const;
 
 /** Overlays that must win over the launcher's letter shortcuts. */
@@ -186,6 +190,7 @@ const SURFACE_UNAVAILABLE_HINTS = {
   pullRequest: "No pull request on this branch yet.",
   pullRequests: "No linked pull requests available.",
   device: "Available from a thread.",
+  taggedThreads: "Available from a thread.",
 } as const;
 
 type TabContextMenuAction =
@@ -325,6 +330,8 @@ function RightPanelEmptyState(props: {
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddDevice: () => void;
+  /** Fork: the tagged-threads tab; only threads have one. */
+  onAddTaggedThreads?: (() => void) | undefined;
   browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
@@ -393,6 +400,14 @@ function RightPanelEmptyState(props: {
       available: props.deviceAvailable,
       disabledReason: SURFACE_UNAVAILABLE_HINTS.device,
       onClick: props.onAddDevice,
+    },
+    {
+      label: "Tagged threads",
+      icon: TagIcon,
+      shortcut: "G",
+      available: props.onAddTaggedThreads !== undefined,
+      disabledReason: SURFACE_UNAVAILABLE_HINTS.taggedThreads,
+      onClick: () => props.onAddTaggedThreads?.(),
     },
   ] as const;
 
@@ -602,6 +617,8 @@ function surfaceTitle(
       return `#${surface.number}`;
     case "pull-requests":
       return "Pull requests";
+    case "tagged-threads":
+      return "Tagged";
     case "device":
       return surface.title ?? surface.target?.name ?? "Device";
     case "preview": {
@@ -685,6 +702,8 @@ function SurfaceIcon({
       );
     case "pull-requests":
       return <PullRequestGlyph.link className="size-3 shrink-0" />;
+    case "tagged-threads":
+      return <TagIcon className="size-3 shrink-0" />;
     case "device":
       return surface.target?.platform === "ios" ? (
         <AppleIcon className="size-3 shrink-0" />
@@ -919,6 +938,14 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       available: props.deviceAvailable,
       disabledReason: SURFACE_DISABLED_REASONS.device,
       onClick: props.onAddDevice,
+    },
+    {
+      label: "Tagged threads",
+      icon: TagIcon,
+      shortcut: "G",
+      available: props.onAddTaggedThreads !== undefined,
+      disabledReason: SURFACE_DISABLED_REASONS.taggedThreads,
+      onClick: () => props.onAddTaggedThreads?.(),
     },
   ] as const;
 
@@ -1403,6 +1430,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddPullRequest={props.onAddPullRequest}
             onAddPullRequests={props.onAddPullRequests}
             onAddDevice={props.onAddDevice}
+            onAddTaggedThreads={props.onAddTaggedThreads}
             browserAvailable={props.browserAvailable}
             terminalAvailable={props.terminalAvailable}
             diffAvailable={props.diffAvailable}
