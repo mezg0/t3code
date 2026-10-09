@@ -37,6 +37,7 @@ import { observeResize } from "~/lib/observeResize";
 import { cn } from "~/lib/utils";
 import { textDirection } from "~/textDirection";
 import { useClientSettings } from "../../hooks/useSettings";
+import { TagParentBreadcrumb } from "~/fork/TagParentBreadcrumb";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
@@ -338,6 +339,9 @@ export const ChatHeader = memo(function ChatHeader({
               <WorkspaceBreadcrumbText>/</WorkspaceBreadcrumbText>
             </WorkspaceBreadcrumbSeparator>
           </>
+        ) : null}
+        {isServerThread ? (
+          <TagParentBreadcrumb threadRef={activeThreadRef} title={activeThreadTitle} />
         ) : null}
         <WorkspaceBreadcrumbItem current className="min-w-10 flex-1">
           {renamingTitle !== null ? (

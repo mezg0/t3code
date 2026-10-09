@@ -154,6 +154,7 @@ import {
   resolveSidebarDropTarget,
   resolveSidebarDropVerb,
   resolveSidebarThreadSection,
+  resolveSidebarThreadStatus,
   searchSidebarThreads,
   shouldCreateNewThreadInCurrentProject,
   shouldNavigateAfterThreadPark,
@@ -177,6 +178,7 @@ import { SidebarDragLifecycle, SidebarPointerSensor } from "./Sidebar.pointer";
 import { createSidebarListMotion } from "./Sidebar.motion";
 import { resolveSnoozePresets, snoozeWakeLabel, type SnoozePreset } from "./Sidebar.snooze";
 import { ProjectFavicon } from "./ProjectFavicon";
+import { isTaggedThread, liveThreadTags, useThreadTagsStore } from "../fork/threadTags";
 import { deriveProviderEntriesByEnvironment } from "../providerInstances";
 import { useStableCallback } from "../hooks/useStableCallback";
 import {
@@ -241,7 +243,8 @@ function sameSidebarProviderEntries(
 // Threads on non-primary environments (T3 Connect, hosted) resolve their
 // provider entry from their own environment's config: default instance ids
 // are driver slugs, so a flat map would collide across environments.
-const sidebarProviderEntriesAtom = Atom.make((get) => {
+// Fork: exported for the Tagged panel's rows.
+export const sidebarProviderEntriesAtom = Atom.make((get) => {
   const providersByEnvironment = get(environmentPresentations.providersByEnvironmentAtom);
   const derived = deriveProviderEntriesByEnvironment(
     [...get(environmentPresentations.serverConfigsAtom)].map(
@@ -285,6 +288,7 @@ const SETTLED_TAIL_INITIAL_COUNT = 10;
 const SETTLED_TAIL_PAGE_COUNT = 25;
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
+const TAGGED_SHELF_EXPANDED_KEY = "t3code:fork:sidebar:tagged-expanded";
 const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
 
 const inboxReturns = createInboxReturnTracker();
@@ -306,6 +310,8 @@ interface SidebarThreadPartitionInput {
   readonly serverConfigs: ReadonlyMap<EnvironmentId, EnvironmentServerConfig>;
   readonly optimisticDrop: SidebarOptimisticDrop | null;
   readonly workingShelfEnabled: boolean;
+  // Fork: live thread tags, by owner thread key.
+  readonly liveTags: Readonly<Record<string, string>>;
   // Snooze wakes and the queued-turn grace depend on the clock, so the minute
   // tick and the precise snooze-wake tick are inputs: a new key repartitions.
   readonly clockKey: string;
@@ -372,6 +378,10 @@ function useSidebarThreads(input: {
   const { projectScopeKey, scopedProjectKeys, serverConfigs, optimisticDrop, routeThreadRef } =
     input;
   const threads = useQuietThreadShells();
+  // Fork: threads that belong to another thread's tag go in the Tagged shelf.
+  const tagsByThreadKey = useThreadTagsStore((state) => state.tagsByThreadKey);
+  const liveThreadKeys = new Set(threads.map(threadShellKey));
+  const liveTags = liveThreadTags(tagsByThreadKey, (threadKey) => liveThreadKeys.has(threadKey));
   const routeRowThreadKey =
     routeThreadRef === null
       ? null
@@ -410,6 +420,11 @@ function useSidebarThreads(input: {
     false,
     Schema.Boolean,
   );
+  const [taggedShelfExpanded, setTaggedShelfExpanded] = useLocalStorage(
+    TAGGED_SHELF_EXPANDED_KEY,
+    false,
+    Schema.Boolean,
+  );
   // The settled tail restarts whenever the project scope changes.
   const [settledTail, setSettledTail] = useState({
     scopeKey: projectScopeKey,
@@ -427,13 +442,20 @@ function useSidebarThreads(input: {
     serverConfigs,
     optimisticDrop,
     workingShelfEnabled,
+    liveTags,
     clockKey: `${nowMinute}:${snoozeWakeTick}`,
   });
   const partitionNextWakeAt = partition.snoozedThreads[0]?.snoozedUntil ?? null;
   if (partitionNextWakeAt !== nextSnoozeWakeAt) setNextSnoozeWakeAt(partitionNextWakeAt);
 
-  const { pinnedThreads, activeThreads, workingThreads, snoozedThreads, settledThreads } =
-    partition;
+  const {
+    pinnedThreads,
+    activeThreads,
+    workingThreads,
+    taggedThreads,
+    snoozedThreads,
+    settledThreads,
+  } = partition;
   const visibleSettledThreads = (() => {
     if (settledThreads.length <= settledVisibleCount) return settledThreads;
     const visible = settledThreads.slice(0, settledVisibleCount);
@@ -454,10 +476,14 @@ function useSidebarThreads(input: {
   const visibleWorkingThreads = workingShelfExpanded
     ? workingThreads
     : routeThreadOnly(workingThreads, routeRowThreadKey);
+  const visibleTaggedThreads = taggedShelfExpanded
+    ? taggedThreads
+    : routeThreadOnly(taggedThreads, routeRowThreadKey);
   const orderedThreads = [
     ...pinnedThreads,
     ...activeThreads,
     ...visibleWorkingThreads,
+    ...visibleTaggedThreads,
     ...visibleSnoozedThreads,
     ...renderedSettledThreads,
   ];
@@ -466,6 +492,7 @@ function useSidebarThreads(input: {
     [pinnedThreads, "pinned"],
     [activeThreads, "active"],
     [workingThreads, "working"],
+    [taggedThreads, "tagged"],
     [snoozedThreads, "snoozed"],
     [settledThreads, "settled"],
   ] as const) {
@@ -480,6 +507,7 @@ function useSidebarThreads(input: {
       ...pinnedThreads,
       ...activeThreads,
       ...workingThreads,
+      ...taggedThreads,
       ...snoozedThreads,
       ...settledThreads,
     ],
@@ -496,9 +524,17 @@ function useSidebarThreads(input: {
     toggleSnoozedShelf: () => setSnoozedShelfExpanded((value) => !value),
     workingShelfExpanded,
     toggleWorkingShelf: () => setWorkingShelfExpanded((value) => !value),
+    taggedShelfExpanded,
+    toggleTaggedShelf: () => setTaggedShelfExpanded((value) => !value),
+    // Collapsed, the header still says when a tagged thread is waiting on you.
+    taggedNeedsYouCount: taggedThreads.filter((thread) => {
+      const status = resolveSidebarThreadStatus(thread);
+      return status === "approval" || status === "input";
+    }).length,
     renderedSettledThreads,
     visibleSnoozedThreads,
     visibleWorkingThreads,
+    visibleTaggedThreads,
     orderedThreadKeys: orderedThreads.map(threadShellKey),
     threadByKey: new Map(orderedThreads.map((thread) => [threadShellKey(thread), thread] as const)),
     settledThreadKeys: new Set(settledThreads.map(threadShellKey)),
@@ -516,7 +552,14 @@ function useSidebarThreads(input: {
 }
 
 function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
-  const { threads, scopedProjectKeys, serverConfigs, optimisticDrop, workingShelfEnabled } = input;
+  const {
+    threads,
+    scopedProjectKeys,
+    serverConfigs,
+    optimisticDrop,
+    workingShelfEnabled,
+    liveTags,
+  } = input;
   const preciseNow = new Date().toISOString();
   const visible = filterSidebarV2VisibleThreads(threads, scopedProjectKeys);
   inboxReturns.observe(workingShelfEnabled ? threads : null);
@@ -525,6 +568,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
   const working: EnvironmentThreadShell[] = [];
   const inbox = (thread: EnvironmentThreadShell) =>
     workingShelfEnabled && isSidebarThreadWorking(thread) ? working : active;
+  const tagged: EnvironmentThreadShell[] = [];
   const snoozed: EnvironmentThreadShell[] = [];
   const settled: EnvironmentThreadShell[] = [];
   const draggable = new Set<string>();
@@ -561,13 +605,20 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
         settled: supportsSettlement && thread.settledOverride === "settled",
         pinned: thread.pinnedAt != null,
       });
+      // Fork: pins, snoozes and settles keep their shelves; the rest of a
+      // tag's threads collect under Tagged, which is not a drop target.
+      const isTagged =
+        section === "active" && isTaggedThread({ key: threadKey, title: thread.title }, liveTags);
+      if (isTagged) draggable.delete(threadKey);
       (section === "snoozed"
         ? snoozed
         : section === "settled"
           ? settled
           : section === "pinned"
             ? pinned
-            : inbox(thread)
+            : isTagged
+              ? tagged
+              : inbox(thread)
       ).push(thread);
     }
   }
@@ -598,6 +649,7 @@ function partitionSidebarThreads(input: SidebarThreadPartitionInput) {
             getId: (thread) => scopedThreadKey(scopeThreadRef(thread.environmentId, thread.id)),
           }),
     workingThreads: sortWorkingThreadsBySend(working),
+    taggedThreads: sortThreadsForSidebar(tagged),
     snoozedThreads: snoozed.toSorted(
       (left, right) =>
         firstValidTimestampMs(left.snoozedUntil ?? null) -
@@ -1077,6 +1129,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     activeReorderableThreadKeys,
     activeThreads,
     workingThreads,
+    taggedThreads,
     snoozedThreads,
     settledThreads,
     snoozeNow,
@@ -1093,6 +1146,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     renderedSettledThreads,
     visibleSnoozedThreads,
     visibleWorkingThreads,
+    taggedShelfExpanded,
+    toggleTaggedShelf,
+    taggedNeedsYouCount,
+    visibleTaggedThreads,
     orderedThreadKeys,
     threadByKey,
     settledThreadKeys,
@@ -1680,6 +1737,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       pinnedThreads.length +
         activeThreads.length +
         workingThreads.length +
+        taggedThreads.length +
         snoozedThreads.length +
         settledThreads.length ===
       0
@@ -1696,6 +1754,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     if (workingThreads.length > 0) {
       items.push({ kind: "marker", marker: "working-header" });
       items.push(...rowsOf(visibleWorkingThreads, "working"));
+    }
+    if (taggedThreads.length > 0) {
+      items.push({ kind: "marker", marker: "tagged-header" });
+      items.push(...rowsOf(visibleTaggedThreads, "tagged"));
     }
     if (snoozedThreads.length > 0) {
       items.push({ kind: "marker", marker: "snoozed-header" });
@@ -2964,7 +3026,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           scopeThreadRef(thread.environmentId, thread.id),
                         );
                         const isCard =
-                          section === "active" || section === "pinned" || section === "working";
+                          section === "active" ||
+                          section === "pinned" ||
+                          section === "working" ||
+                          section === "tagged";
                         const rowVariant = isCard ? "card" : "slim";
                         return (
                           <SortableThreadRow
@@ -3142,12 +3207,32 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               />,
                             );
                             break;
+                          case "tagged-header":
+                            items.push(
+                              <SidebarSectionHeader
+                                key="tagged-shelf-header"
+                                marker="tagged-header"
+                                className={cn(workingThreads.length === 0 && "mt-auto")}
+                                label={`${taggedShelfExpanded ? "Tagged" : `Tagged (${taggedThreads.length})`}${
+                                  taggedNeedsYouCount > 0
+                                    ? ` · ${taggedNeedsYouCount} need${taggedNeedsYouCount === 1 ? "s" : ""} you`
+                                    : ""
+                                }`}
+                                toggle={{
+                                  expanded: taggedShelfExpanded,
+                                  onToggle: toggleTaggedShelf,
+                                }}
+                              />,
+                            );
+                            break;
                           case "snoozed-header":
                             items.push(
                               <SidebarSectionHeader
                                 key="snoozed-shelf-header"
                                 marker="snoozed-header"
-                                className={cn(workingThreads.length === 0 && "mt-auto")}
+                                className={cn(
+                                  workingThreads.length + taggedThreads.length === 0 && "mt-auto",
+                                )}
                                 label={
                                   snoozedShelfExpanded
                                     ? "Snoozed"
@@ -3166,7 +3251,10 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 key="settled-shelf-header"
                                 marker="settled-header"
                                 className={cn(
-                                  workingThreads.length + snoozedThreads.length === 0 && "mt-auto",
+                                  workingThreads.length +
+                                    taggedThreads.length +
+                                    snoozedThreads.length ===
+                                    0 && "mt-auto",
                                 )}
                                 label={
                                   settledShelfExpanded
@@ -3226,6 +3314,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           pinnedThreads.length +
             activeThreads.length +
             workingThreads.length +
+            taggedThreads.length +
             snoozedThreads.length +
             settledThreads.length ===
             0 ? (
