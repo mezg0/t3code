@@ -182,12 +182,15 @@ Recorded so nobody re-litigates them:
   Putting the status in the project icon's slot was tried and rejected because it hid the project.
 - Hover swaps the badges and status for Snooze and Settle; a Woke alarm stays visible, and clicking
   it dismisses it. The diff count and machine icon live in the hover tooltip, not the row.
-- Agent fan-outs (a coordinator launching a worker thread per issue) are organised by **project**:
-  each kind of work gets its own clone of the repo as its own project, and the project filter
-  switches between them. Nesting launched threads under their launcher was built and removed: the
-  server records no parent, so the client had to guess it from each thread's first message.
-  Clones of one repo merge into one project in the sidebar unless that project's grouping is set
-  to separate.
+- Agent fan-outs (a coordinator launching a worker thread per issue) use **thread tags**. A
+  coordinator thread owns a tag (right panel → Tagged threads, e.g. `SENTRY`), and threads whose
+  titles start with `{{SENTRY}}` belong to it: they're listed in its Tagged panel (using the
+  sidebar's own rows), their header has a "↰ coordinator" crumb back, and the sidebar files them
+  under a collapsible Tagged shelf (pins, snoozes and settles keep their own shelves; the header
+  counts threads that need Brandon). One owner per tag. Tags live on the device; an archived or
+  deleted owner releases its threads. Membership is the title prefix, so agents must keep it.
+  Earlier attempts: nesting launched threads under their launcher (removed: the server records no
+  parent, so the client guessed from first messages), then a repo clone per kind of work (dropped).
 - **Project groups** are named sets of projects at the top of the project filter ("New group…"
   creates one; the pencil edits or deletes it). They're stored per device, like the filter itself.
   Ctrl+1–9 on macOS (Alt+1–9 elsewhere; Ctrl/Cmd+digit jumps to threads) picks group 1–9 and
