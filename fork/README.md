@@ -49,8 +49,8 @@ server's version: every build is based on the exact Nightly tag Zeus runs.
      into `brandon` on `origin`.
    - **Fast-forward** (small fixes Brandon has already approved):
      `cd ~/code/t3code && git merge --ff-only fork/<topic> && git push origin brandon`.
-   Fetch first and rebase your branch if `brandon` has moved; other threads land on it too.
-   Never force-push `brandon` yourself; only `sync.sh`'s rebase does that.
+     Fetch first and rebase your branch if `brandon` has moved; other threads land on it too.
+     Never force-push `brandon` yourself; only `sync.sh`'s rebase does that.
 5. Ship it (next section), then remove the worktree and branch.
 
 To undo a shipped change, `git revert` it on `brandon` rather than rewriting history.
@@ -111,9 +111,9 @@ is no launchd job any more; the scheduled task is the only trigger.
   the app is closed. It doesn't notify; a running app picks the build up later.
 - `watch` runs all the time (launchd `com.brandon.t3fork.watch`). It installs a staged build as
   soon as the app quits, and restarts into a newer build if one is ready within 30 seconds of launch.
-- The sidebar's **Update to latest build** button installs on demand. `t3-update status` shows the
-  installed, staged and latest builds; `t3-update rollback` goes back one build.
-- Installs are serialised by a lock, so the watcher, the check and the button can't race.
+- `t3-update status` shows the installed, staged and latest builds; `t3-update rollback` goes back
+  one build.
+- Installs are serialised by a lock, so the watcher and the check can't race.
 - The only notifications are "build failed" and "Updating T3 Code (Brandon)" (an auto-restart
   just after launch).
 - To get a fresh build onto Hermes without waiting: `ssh hermes '~/.local/bin/t3-update check'`.
@@ -182,9 +182,11 @@ Recorded so nobody re-litigates them:
   Putting the status in the project icon's slot was tried and rejected because it hid the project.
 - Hover swaps the badges and status for Snooze and Settle; a Woke alarm stays visible, and clicking
   it dismisses it. The diff count and machine icon live in the hover tooltip, not the row.
-- Threads that an agent launched (`t3_thread_launch` or `create_threads`) nest under the launching
-  thread behind a `↳ N` chip. The server records no parent, so the client reads the sender of each
-  thread's first message; threads imported from V1 are skipped.
+- **The fork is only these rows.** On 2026-10-25 everything else was dropped (thread tags, project
+  groups and their shortcuts, the project filter shortcut, the pinned divider, launched-thread
+  nesting, the Overview removal and the sidebar update button), because upstream covers enough of
+  it. The old stack is on `origin/brandon-backup-20261025`. Upstream is discussing compact rows for
+  every section in pingdotgg/t3code discussion #17319; once that ships, retire the fork.
 - The "No project" icon is a project setting (Project settings → Project icon), not code. Brandon
   chose `message-circle` in gray.
 
