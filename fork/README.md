@@ -182,8 +182,9 @@ Recorded so nobody re-litigates them:
   Putting the status in the project icon's slot was tried and rejected because it hid the project.
 - Hover swaps the badges and status for Snooze and Settle; a Woke alarm stays visible, and clicking
   it dismisses it. The diff count and machine icon live in the hover tooltip, not the row.
-- **The fork is only these rows.** On 2026-10-25 everything else was dropped (thread tags, project
-  groups and their shortcuts, the project filter shortcut, the pinned divider, launched-thread
+- A hairline divider sits under the pinned threads (`apps/web/src/fork/SidebarPinnedDivider.tsx`).
+- **The fork is only these rows and the pinned divider.** On 2026-10-25 everything else was dropped (thread tags, project
+  groups and their shortcuts, the project filter shortcut, launched-thread
   nesting, the Overview removal and the sidebar update button), because upstream covers enough of
   it. The old stack is on `origin/brandon-backup-20261025`. Upstream is discussing compact rows for
   every section in pingdotgg/t3code discussion #17319; once that ships, retire the fork.
