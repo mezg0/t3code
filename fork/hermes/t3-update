@@ -80,13 +80,17 @@ stage_latest_locked() {
   id="$(json_field "$STATE/latest.json" buildId)"
   [[ -n "$id" ]] || { log "No build published yet"; return 1; }
   if [[ "$id" == "$(installed_id)" || "$id" == "$(staged_id)" ]]; then
+    [[ -t 1 ]] && log "Already have $id"
     return 0
   fi
   zip="$(json_field "$STATE/latest.json" zip)"
   sha="$(json_field "$STATE/latest.json" sha256)"
   log "Downloading $id"
   tmp="$(mktemp -d "$STATE/download.XXXXXX")"
-  scp -q -o BatchMode=yes "$ZEUS:$zip" "$tmp/build.zip" || { rm -rf "$tmp"; log "Download failed for $id"; return 1; }
+  # Progress bar in a terminal; quiet under launchd so the log stays readable.
+  local quiet=-q
+  [[ -t 1 ]] && quiet=
+  scp $quiet -o BatchMode=yes "$ZEUS:$zip" "$tmp/build.zip" || { rm -rf "$tmp"; log "Download failed for $id"; return 1; }
   [[ "$(shasum -a 256 "$tmp/build.zip" | cut -d' ' -f1)" == "$sha" ]] || {
     rm -rf "$tmp"
     log "Checksum mismatch for $id"
@@ -105,7 +109,7 @@ stage_latest_locked() {
 # install at once. Without this lock, a second install moved the freshly
 # installed app aside and then found nothing staged, leaving no app at all.
 with_lock() { # command...
-  local lock="$STATE/update.lock" pid rc=0
+  local lock="$STATE/update.lock" pid rc=0 waiting=0
   for _ in $(seq 1 300); do
     if mkdir "$lock" 2>/dev/null; then
       echo $$ >"$lock/pid"
@@ -117,6 +121,10 @@ with_lock() { # command...
     if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then
       rm -rf "$lock"
       continue
+    fi
+    if [[ $waiting -eq 0 ]]; then
+      log "Waiting for another update (pid ${pid:-?}) to finish..."
+      waiting=1
     fi
     sleep 1
   done

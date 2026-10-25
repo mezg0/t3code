@@ -116,8 +116,8 @@ is no launchd job any more; the scheduled task is the only trigger.
 - Installs are serialised by a lock, so the watcher and the check can't race.
 - The only notifications are "build failed" and "Updating T3 Code (Brandon)" (an auto-restart
   just after launch).
-- To get a fresh build onto Hermes without waiting: `ssh hermes '~/.local/bin/t3-update check'`.
-  Zeus never needs SSH access to Hermes for normal updates; Hermes pulls.
+- To get a fresh build onto Hermes without waiting, run `t3-update install` on Hermes (it quits
+  and reopens the app). Zeus can't SSH into Hermes; Hermes pulls.
 - After editing `t3-update`, copy it to `~/.local/bin/t3-update` on Hermes and restart the watcher
   there: `launchctl kickstart -k gui/$(id -u)/com.brandon.t3fork.watch`.
 
