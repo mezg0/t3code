@@ -175,15 +175,20 @@ Nightly (from launchd, see above), then run `t3 connect publish` to turn push no
 
 Recorded so nobody re-litigates them:
 
-- **One-line thread rows (36px).** A two-line layout (title, then branch, PR and time) was shipped
-  and reverted: it showed fewer threads without adding useful information. Rows show no times.
+- **Row style is a setting** (Settings → Appearance → Sidebar rows, per device in localStorage via
+  `apps/web/src/fork/SidebarRowStyle.tsx`): one line (default), two lines, or upstream's vanilla
+  rows. Two lines is upstream's empty-meta-line layout forced on for every thread: project and
+  status above the title, no branch line. Vanilla is untouched upstream code, so the row file keeps
+  upstream's card intact and the one-line row is an early return before it.
+- **One-line thread rows (36px).** An older two-line layout (title, then branch, PR and time) was
+  shipped and reverted: it showed fewer threads without adding useful information. Rows show no times.
 - **Row order:** project icon, title, PR and terminal badges, then the status icon at the right
   edge. Status icons line up on the right; badges shift left only on rows that have a status.
   Putting the status in the project icon's slot was tried and rejected because it hid the project.
 - Hover swaps the badges and status for Snooze and Settle; a Woke alarm stays visible, and clicking
-  it dismisses it. The diff count and machine icon live in the hover tooltip, not the row.
+  it dismisses it. The machine is in the hover tooltip, not the row.
 - A hairline divider sits under the pinned threads (`apps/web/src/fork/SidebarPinnedDivider.tsx`).
-- **The fork is only these rows and the pinned divider.** On 2026-10-25 everything else was dropped (thread tags, project
+- **The fork is only these rows, their setting and the pinned divider.** On 2026-10-25 everything else was dropped (thread tags, project
   groups and their shortcuts, the project filter shortcut, launched-thread
   nesting, the Overview removal and the sidebar update button), because upstream covers enough of
   it. The old stack is on `origin/brandon-backup-20261025`. Upstream is discussing compact rows for
