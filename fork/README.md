@@ -42,7 +42,7 @@ server's version: every build is based on the exact Nightly tag Zeus runs.
    export CI=true PATH="$HOME/.nvm/versions/node/v24.15.0/bin:$PWD/node_modules/.bin:$PATH"
    pnpm install --frozen-lockfile
    pnpm --filter @t3tools/web typecheck   # or `pnpm typecheck` for everything
-   pnpm --filter @t3tools/web test
+   pnpm --filter @t3tools/web exec vp test run --project unit
    ```
 4. Commit with a `fork:` or `fork(<area>):` subject, then land it on `brandon` either way:
    - **Pull request** (features, anything Brandon should review): push `fork/<topic>` and open a PR
