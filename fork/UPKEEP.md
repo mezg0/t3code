@@ -17,7 +17,7 @@ may ask you to fix or change things directly.
      by keeping upstream's change and re-applying the fork's intent on top.
    - **Typecheck or test failures.** Fold the fix into the fork commit that caused it:
      `git commit --fixup=<sha>`, then `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <target tag>`.
-   - Verify with `pnpm typecheck` and `pnpm --filter @t3tools/web test`, then
+   - Verify with `pnpm typecheck` and `pnpm --filter @t3tools/web exec vp test run --project unit`, then
      `git push --force-with-lease origin brandon` and run `fork/sync.sh` again.
 4. Report what broke, what you changed and the new build ID.
 
