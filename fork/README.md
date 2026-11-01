@@ -188,7 +188,9 @@ Recorded so nobody re-litigates them:
 - Hover swaps the badges and status for Snooze and Settle; a Woke alarm stays visible, and clicking
   it dismisses it. The machine is in the hover tooltip, not the row.
 - A hairline divider sits under the pinned threads (`apps/web/src/fork/SidebarPinnedDivider.tsx`).
-- **The fork is only these rows, their setting and the pinned divider.** On 2026-10-25 everything else was dropped (thread tags, project
+- **Prompt stashes are per project** (per environment and project, 20 each). Entries with no project
+  are ignored. Upstream shares one list across every project.
+- **The fork is only these rows, their setting, the pinned divider and per-project stashes.** On 2026-10-25 everything else was dropped (thread tags, project
   groups and their shortcuts, the project filter shortcut, launched-thread
   nesting, the Overview removal and the sidebar update button), because upstream covers enough of
   it. The old stack is on `origin/brandon-backup-20261025`. Upstream is discussing compact rows for
