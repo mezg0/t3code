@@ -2324,6 +2324,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     toggleStashMenuStable,
   } = useComposerStash({
     environmentId,
+    activeProjectId,
     composerDraftTarget,
     promptRef,
     readAttachmentDraft: () => ({

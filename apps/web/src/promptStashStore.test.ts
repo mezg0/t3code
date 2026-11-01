@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vite-plus/test";
-import { EnvironmentId, MessageId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, MessageId, ProjectId, ThreadId } from "@t3tools/contracts";
 import {
   collectAssistantCitations,
   serializeAssistantCitation,
@@ -12,6 +12,7 @@ import {
   PROMPT_STASH_STORAGE_KEY,
   MAX_STASH_ENTRY_ATTACHMENT_CHARS,
   partitionStashAttachments,
+  selectProjectStashEntries,
   usePromptStashStore,
   writePromptStashStorageForTest,
   type PromptStashEntry,
@@ -116,14 +117,32 @@ describe("promptStashStore", () => {
 
   it("evicts the oldest entry past the cap and returns it", () => {
     const store = usePromptStashStore.getState();
+    const otherProject = { ...makeEntry({ id: "other-project" }), projectId: ProjectId.make("p2") };
+    store.stashEntry(otherProject);
     for (let index = 0; index < MAX_STASH_ENTRIES; index += 1) {
       expect(store.stashEntry(makeEntry({ id: `entry-${index}` })).evicted).toBeNull();
     }
     const { evicted } = store.stashEntry(makeEntry({ id: "overflow" }));
     expect(evicted?.id).toBe("entry-0");
     const entries = usePromptStashStore.getState().entries;
-    expect(entries).toHaveLength(MAX_STASH_ENTRIES);
+    expect(entries).toHaveLength(MAX_STASH_ENTRIES + 1);
     expect(entries[0]?.id).toBe("overflow");
+    expect(entries.map((entry) => entry.id)).toContain("other-project");
+  });
+
+  it("selects only entries from the same environment and project", () => {
+    const environmentId = EnvironmentId.make("env-1");
+    const projectId = ProjectId.make("p1");
+    const entries = [
+      { ...makeEntry({ id: "match" }), environmentId, projectId },
+      { ...makeEntry({ id: "other-project" }), environmentId, projectId: ProjectId.make("p2") },
+      { ...makeEntry({ id: "other-env" }), environmentId: EnvironmentId.make("env-2"), projectId },
+      makeEntry({ id: "unscoped" }),
+    ];
+    expect(
+      selectProjectStashEntries(entries, environmentId, projectId).map((entry) => entry.id),
+    ).toEqual(["match"]);
+    expect(selectProjectStashEntries(entries, environmentId, null)).toEqual([]);
   });
 
   // regression: #4787 stashed prompts were lost when switching providers

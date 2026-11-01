@@ -1,4 +1,9 @@
-import { ComposerContextRecord, ForwardCompatibleArray } from "@t3tools/contracts";
+import {
+  ComposerContextRecord,
+  EnvironmentId,
+  ForwardCompatibleArray,
+  ProjectId,
+} from "@t3tools/contracts";
 import * as Schema from "effect/Schema";
 import { create } from "zustand";
 
@@ -19,6 +24,9 @@ export const MAX_STASH_ENTRY_ATTACHMENT_CHARS = 2_700_000;
 const StashEntrySchema = Schema.Struct({
   id: Schema.String,
   createdAt: Schema.String,
+  // Fork: scopes the entry to a project; entries without these never match a project.
+  environmentId: Schema.optionalKey(EnvironmentId),
+  projectId: Schema.optionalKey(ProjectId),
   prompt: Schema.String,
   attachments: Schema.Array(PersistedComposerImageAttachment),
   files: Schema.optionalKey(Schema.Array(PersistedComposerFileAttachment)),
@@ -55,6 +63,17 @@ function clearOrphanedPendingImages(
       ],
     };
   });
+}
+
+export function selectProjectStashEntries(
+  entries: ReadonlyArray<PromptStashEntry>,
+  environmentId: EnvironmentId,
+  projectId: ProjectId | null,
+): ReadonlyArray<PromptStashEntry> {
+  if (projectId === null) return [];
+  return entries.filter(
+    (entry) => entry.environmentId === environmentId && entry.projectId === projectId,
+  );
 }
 
 export function partitionStashAttachments(
@@ -147,8 +166,14 @@ interface PromptStashStoreState {
 export const usePromptStashStore = create<PromptStashStoreState>()((set, get) => ({
   entries: [],
   stashEntry: (entry) => {
-    const nextEntries = [entry, ...get().entries];
-    const evicted = nextEntries.length > MAX_STASH_ENTRIES ? (nextEntries.pop() ?? null) : null;
+    // Fork: the cap is per project, so stashing here never evicts another project's entry.
+    const allEntries = [entry, ...get().entries];
+    const sameProject = allEntries.filter(
+      (candidate) =>
+        candidate.environmentId === entry.environmentId && candidate.projectId === entry.projectId,
+    );
+    const evicted = sameProject[MAX_STASH_ENTRIES] ?? null;
+    const nextEntries = allEntries.filter((candidate) => candidate !== evicted);
     const { written, durable } = persistEntries(nextEntries);
     // Failed writes must not duplicate the intact composer; eviction also commits only on success.
     if (!written) {
