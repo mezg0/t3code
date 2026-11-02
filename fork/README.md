@@ -190,7 +190,14 @@ Recorded so nobody re-litigates them:
 - A hairline divider sits under the pinned threads (`apps/web/src/fork/SidebarPinnedDivider.tsx`).
 - **Prompt stashes are per project** (per environment and project, 20 each). Entries with no project
   are ignored. Upstream shares one list across every project.
-- **The fork is only these rows, their setting, the pinned divider and per-project stashes.** On 2026-10-25 everything else was dropped (thread tags, project
+- **Subagents tab** (`apps/web/src/fork/SubagentsPanel.tsx`): a right-panel tab, opened from the
+  tab menu or the command palette, listing the T3 subagents (`creationSource: "mcp"`, not the
+  provider's own) of the current thread; a subagent with none of its own lists its parent's. The
+  server leaves idle subagents out of the shell stream and a thread's `subagents` only cover its
+  recent turns, so the tab mounts the thread family to get them all. That's a read per thread, so a
+  left-sidebar list across every thread could only show the running ones cheaply.
+- **The fork is only these rows, their setting, the pinned divider, per-project stashes and the
+  Subagents tab.** On 2026-10-25 everything else was dropped (thread tags, project
   groups and their shortcuts, the project filter shortcut, launched-thread
   nesting, the Overview removal and the sidebar update button), because upstream covers enough of
   it. The old stack is on `origin/brandon-backup-20261025`. Upstream is discussing compact rows for
