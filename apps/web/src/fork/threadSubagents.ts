@@ -1,5 +1,6 @@
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import type { RuntimeSubagentStatus } from "@t3tools/client-runtime/state/subagentRuntime";
+import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subagent-display";
 import {
   isOrchestrationV2WorkActive,
   isProviderNativeSubagentThread,
@@ -93,6 +94,19 @@ export function t3SubagentRows(input: {
         Number(isOrchestrationV2WorkActive(left.status)) ||
       sortTime(right).localeCompare(sortTime(left)),
   );
+}
+
+/** Rows whose shown title contains every word of the query, ignoring case. */
+export function filterSubagentRowsByTitle(
+  rows: ReadonlyArray<T3SubagentRow>,
+  query: string,
+): ReadonlyArray<T3SubagentRow> {
+  const words = query.toLowerCase().split(/\s+/u).filter(Boolean);
+  if (words.length === 0) return rows;
+  return rows.filter((row) => {
+    const title = formatSubagentDisplayTitle(row.title).toLowerCase();
+    return words.every((word) => title.includes(word));
+  });
 }
 
 /** The thread that delegated this one, which may live in another environment. */

@@ -7,7 +7,7 @@ import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subage
 import { isOrchestrationV2WorkActive, type ScopedThreadRef } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { CornerLeftUpIcon } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { AgentElapsed } from "../components/chat/AgentElapsed";
 import { SubagentTooltipContent } from "../components/chat/SubagentTooltipContent";
@@ -17,6 +17,7 @@ import {
   threadRelationshipStatusLabel,
 } from "../components/chat/ThreadRelationshipIcon";
 import { ThreadHoverCardPopup } from "../components/ThreadHoverCard";
+import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../components/ui/tooltip";
 import { useRightPanelStore } from "../rightPanelStore";
@@ -26,11 +27,17 @@ import { useEnvironment, useEnvironmentProviders } from "../state/environments";
 import { useEnvironmentQuery } from "../state/query";
 import { threadFamilies } from "../state/threads";
 import { buildThreadRouteParams } from "../threadRoutes";
-import { delegatingThreadRef, t3SubagentRows, type T3SubagentRow } from "./threadSubagents";
+import {
+  delegatingThreadRef,
+  filterSubagentRowsByTitle,
+  t3SubagentRows,
+  type T3SubagentRow,
+} from "./threadSubagents";
 
 /** Fork: the right-panel tab listing the T3 subagents a thread delegated. */
 export function SubagentsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
   const navigate = useNavigate();
+  const [titleQuery, setTitleQuery] = useState("");
   const current = useQuietThreadProjection(threadRef)?.projection ?? null;
   const parentRef = current === null ? null : delegatingThreadRef(threadRef, current.thread);
   const parent = useQuietThreadProjection(parentRef)?.projection ?? null;
@@ -72,6 +79,7 @@ export function SubagentsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
         });
   const showsParentRows = currentRows.length === 0 && parentRef !== null;
   const rows = showsParentRows ? parentRows : currentRows;
+  const visibleRows = filterSubagentRowsByTitle(rows, titleQuery);
   const listOwner = showsParentRows ? parent : current;
   const runtimeById = new Map(
     projectedSubagentsToRuntime(listOwner?.subagents ?? []).map((agent) => [agent.id, agent]),
@@ -89,9 +97,25 @@ export function SubagentsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
       <div className="flex items-center gap-2 border-b px-3 py-2 text-xs">
         <span className="font-medium text-foreground">Subagents</span>
         <span className="text-muted-foreground tabular-nums">
-          {runningCount > 0 ? `${rows.length} · ${runningCount} running` : rows.length}
+          {visibleRows.length !== rows.length
+            ? `${visibleRows.length} of ${rows.length}`
+            : runningCount > 0
+              ? `${rows.length} · ${runningCount} running`
+              : rows.length}
         </span>
       </div>
+      {rows.length === 0 ? null : (
+        <div className="border-b p-1.5">
+          <Input
+            type="search"
+            size="sm"
+            aria-label="Filter subagents by title"
+            placeholder="Filter by title"
+            value={titleQuery}
+            onChange={(event) => setTitleQuery(event.currentTarget.value)}
+          />
+        </div>
+      )}
       <ScrollArea className="min-h-0 flex-1">
         <ul className="flex flex-col gap-px p-1.5">
           {parentRef === null ? null : (
@@ -109,7 +133,7 @@ export function SubagentsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
               </ThreadDetailsControl>
             </li>
           )}
-          {rows.map((row) => (
+          {visibleRows.map((row) => (
             <SubagentRow
               key={row.key}
               row={row}
@@ -120,6 +144,9 @@ export function SubagentsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
             />
           ))}
         </ul>
+        {rows.length > 0 && visibleRows.length === 0 ? (
+          <p className="px-4 py-2 text-sm text-muted-foreground">No subagents match that title.</p>
+        ) : null}
         {rows.length === 0 && family.data !== null ? (
           <p className="px-4 py-2 text-sm text-muted-foreground">
             This thread hasn't delegated to a subagent.

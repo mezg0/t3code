@@ -9,7 +9,7 @@ import {
 import { DateTime } from "effect";
 import { describe, expect, it } from "vite-plus/test";
 
-import { delegatingThreadRef, t3SubagentRows } from "./threadSubagents";
+import { delegatingThreadRef, filterSubagentRowsByTitle, t3SubagentRows } from "./threadSubagents";
 
 const at = (minute: number) => DateTime.makeUnsafe(minute * 60_000);
 const parentThreadId = ThreadId.make("parent");
@@ -104,6 +104,38 @@ describe("t3SubagentRows", () => {
       ["queued", "pending"],
       ["rolled-back", "interrupted"],
     ]);
+  });
+});
+
+describe("filterSubagentRowsByTitle", () => {
+  const rows = t3SubagentRows({
+    threadId: parentThreadId,
+    shells: [
+      child("Adversarial review #1448", 2),
+      child("Subagent: Recheck #1463", 1),
+      child("Subagent: Delta", 0),
+    ],
+    subagents: [],
+  });
+  const titles = (query: string) => filterSubagentRowsByTitle(rows, query).map((row) => row.key);
+
+  it.each([
+    ["review", ["Adversarial review #1448"]],
+    ["  RECHECK ", ["Subagent: Recheck #1463"]],
+    ["1448 ADVERS", ["Adversarial review #1448"]],
+    ["review 1463", []],
+    ["#14", ["Adversarial review #1448", "Subagent: Recheck #1463"]],
+    ["nothing", []],
+  ])("matches %j ignoring case and padding", (query, expected) => {
+    expect(titles(query)).toEqual(expected);
+  });
+
+  it("matches the shown title, not the hidden Subagent: prefix", () => {
+    expect(titles("subagent")).toEqual([]);
+  });
+
+  it("keeps every row for a blank query", () => {
+    expect(titles("   ")).toHaveLength(3);
   });
 });
 
