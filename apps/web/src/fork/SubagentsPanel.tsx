@@ -34,6 +34,9 @@ import {
   type T3SubagentRow,
 } from "./threadSubagents";
 
+// The control's press scale moves rows this wide too far.
+const ROW_WITHOUT_PRESS_SCALE = "[&:active:not([aria-haspopup])]:scale-100";
+
 /** Fork: the right-panel tab listing the T3 subagents a thread delegated. */
 export function SubagentsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
   const navigate = useNavigate();
@@ -124,6 +127,7 @@ export function SubagentsPanel({ threadRef }: { threadRef: ScopedThreadRef }) {
                 size="sm"
                 variant="ghost"
                 part="row"
+                className={ROW_WITHOUT_PRESS_SCALE}
                 onClick={() => open(parentRef)}
               >
                 <ThreadRelationshipIcon fallbackIcon={CornerLeftUpIcon} status={null} />
@@ -193,6 +197,7 @@ function SubagentRow(props: {
               size="sm"
               variant="ghost"
               part="row"
+              className={ROW_WITHOUT_PRESS_SCALE}
               disabled={!openable}
               aria-current={
                 target !== null && scopedThreadKey(target) === props.currentThreadKey
