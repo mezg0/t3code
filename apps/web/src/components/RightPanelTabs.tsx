@@ -46,6 +46,7 @@ import {
   MessagesSquare,
   Plus,
   TerminalSquare,
+  BotIcon,
 } from "lucide-react";
 import { Volume2, VolumeOff } from "lucide";
 import {
@@ -141,6 +142,8 @@ export interface RightPanelTabsProps {
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddDevice: () => void;
+  /** Fork: the Subagents tab; only server threads have one. */
+  onAddSubagents?: (() => void) | undefined;
   /** Absent where side chats are not offered. */
   onAddSideChat?: (() => void) | undefined;
   browserAvailable: boolean;
@@ -179,6 +182,7 @@ const SURFACE_DISABLED_REASONS = {
   pullRequest: "This thread's branch has no pull request yet.",
   pullRequests: "No linked pull requests are available for this thread.",
   device: "Devices are only available from a thread.",
+  subagents: "Subagents are only available from a thread.",
   sideChat: "Side chats start after the first message.",
 } as const;
 
@@ -204,6 +208,7 @@ const SURFACE_UNAVAILABLE_HINTS = {
   pullRequest: "No pull request on this branch yet.",
   pullRequests: "No linked pull requests available.",
   device: "Available from a thread.",
+  subagents: "Available from a thread.",
   sideChat: "Available after the first message.",
 } as const;
 
@@ -322,6 +327,8 @@ function RightPanelEmptyState(props: {
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddDevice: () => void;
+  /** Fork: the Subagents tab; only server threads have one. */
+  onAddSubagents?: (() => void) | undefined;
   /** Absent where side chats are not offered. */
   onAddSideChat?: (() => void) | undefined;
   browserAvailable: boolean;
@@ -393,6 +400,15 @@ function RightPanelEmptyState(props: {
       available: props.deviceAvailable,
       disabledReason: SURFACE_UNAVAILABLE_HINTS.device,
       onClick: props.onAddDevice,
+    },
+    {
+      label: "Subagents",
+      description: "See the T3 subagents this thread delegated.",
+      icon: BotIcon,
+      shortcut: "A",
+      available: props.onAddSubagents !== undefined,
+      disabledReason: SURFACE_UNAVAILABLE_HINTS.subagents,
+      onClick: () => props.onAddSubagents?.(),
     },
     ...(props.onAddSideChat
       ? [
@@ -590,6 +606,8 @@ function surfaceTitle(
       return `#${surface.number}`;
     case "pull-requests":
       return "Pull requests";
+    case "subagents":
+      return "Subagents";
     case "device":
       return surface.title ?? surface.target?.name ?? "Device";
     case "side-chat":
@@ -682,6 +700,8 @@ function SurfaceIcon({
       );
     case "pull-requests":
       return <PullRequestGlyph.link className="size-3 shrink-0" />;
+    case "subagents":
+      return <BotIcon className="size-3 shrink-0" />;
     case "side-chat":
       return <SideChatTabIcon environmentId={environmentId} threadId={surface.threadId} />;
     case "device":
@@ -1147,6 +1167,14 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       disabledReason: SURFACE_DISABLED_REASONS.device,
       onClick: props.onAddDevice,
     },
+    {
+      label: "Subagents",
+      icon: BotIcon,
+      shortcut: "A",
+      available: props.onAddSubagents !== undefined,
+      disabledReason: SURFACE_DISABLED_REASONS.subagents,
+      onClick: () => props.onAddSubagents?.(),
+    },
     ...(props.onAddSideChat
       ? [
           {
@@ -1533,6 +1561,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddPullRequest={props.onAddPullRequest}
             onAddPullRequests={props.onAddPullRequests}
             onAddDevice={props.onAddDevice}
+            onAddSubagents={props.onAddSubagents}
             onAddSideChat={props.onAddSideChat}
             browserAvailable={props.browserAvailable}
             terminalAvailable={props.terminalAvailable}

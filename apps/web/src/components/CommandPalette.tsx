@@ -55,6 +55,7 @@ import {
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeftIcon,
+  BotIcon,
   BugIcon,
   ChartNoAxesColumnIcon,
   CheckIcon,
@@ -1421,6 +1422,17 @@ function OpenCommandPaletteDialog(props: {
       icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
       run: async () => {
         useRightPanelStore.getState().open(threadRef, "pull-requests");
+      },
+    });
+    // Fork: the Subagents tab.
+    actionItems.push({
+      kind: "action",
+      value: "action:open-thread-subagents",
+      searchTerms: ["subagents", "agents", "delegated", "tasks"],
+      title: "Show subagents",
+      icon: <BotIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        useRightPanelStore.getState().open(threadRef, "subagents");
       },
     });
   }
