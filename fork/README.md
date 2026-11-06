@@ -187,6 +187,8 @@ Recorded so nobody re-litigates them:
   Putting the status in the project icon's slot was tried and rejected because it hid the project.
 - Hover swaps the badges and status for Snooze and Settle; a Woke alarm stays visible, and clicking
   it dismisses it. The machine is in the hover tooltip, not the row.
+- **No sidebar row motion.** Upstream's slide/fade when rows reorder, appear or leave (and the
+  glide after a drag-drop) is switched off in `Sidebar.tsx`; rows snap into place.
 - A hairline divider sits under the pinned threads (`apps/web/src/fork/SidebarPinnedDivider.tsx`).
 - **Prompt stashes are per project** (per environment and project, 20 each). Entries with no project
   are ignored. Upstream shares one list across every project.
