@@ -1723,7 +1723,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     dragScrollRef.current = null;
     endThreadContextDrag();
     if (started) {
-      listMotionRef.current?.release();
+      // Fork: rows snap into place after a drop instead of gliding there.
+      listMotionRef.current?.suspend();
       setDragState(null);
     }
   };
@@ -1995,8 +1996,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     visibleDraftSessionCount,
     routeDraftIdForRows ?? "",
   ].join("\0");
-  const listMotionAnimate =
-    dragState === null && sidebarListItems.length + visibleDraftSessionCount > 0;
+  // Fork: no row slide/fade animations when the sidebar list changes.
+  const listMotionAnimate = false;
   // Cache on both fields so layout-key changes trigger the effect even when animate is unchanged.
   const listMotionPass = { layoutKey: listMotionLayoutKey, animate: listMotionAnimate };
   const shelfExpansionKey = [workingShelfExpanded, snoozedShelfExpanded, settledShelfExpanded].join(
