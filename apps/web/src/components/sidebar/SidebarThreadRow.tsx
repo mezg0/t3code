@@ -1472,9 +1472,10 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
             }
           >
             {accessibleTitle}
-            {/* Fork: one line. Project icon, title, then badges and the status at
-                the right edge; the hover actions take their place. */}
-            <div className="relative z-10 flex h-9 min-w-0 items-center gap-1.5 px-(--sidebar-row-content-inset)">
+            {/* Fork: one line. Project icon, title, then the status at the right
+                edge; the hover actions take its place. The row and its padding
+                total 36px, the slim-row height the drag projection scales from. */}
+            <div className="relative z-10 flex h-8 min-w-0 items-center gap-1.5 px-(--sidebar-row-content-inset)">
               {draftIndicator}
               {props.project ? (
                 <ProjectFavicon project={props.project} className="size-4 shrink-0" />
@@ -1495,7 +1496,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
                 >
-                  {/* Badges and status give way to the hover actions. */}
+                  {/* The status gives way to the hover actions. */}
                   <span
                     className={cn(
                       "flex items-center gap-1.5 self-center text-secondary-label",
@@ -1504,10 +1505,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                       snoozeMenuOpen && "hidden",
                     )}
                   >
-                    {terminalStatusIcon}
-                    {prBadge}
-                    {/* Fork: status sits last, so status icons line up on the right edge
-                        and badges shift left only when a row has one. */}
                     {isWokeStatus ? null : statusIcon}
                   </span>
                   {showHoverActions ? (

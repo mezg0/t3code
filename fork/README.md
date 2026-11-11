@@ -180,16 +180,22 @@ Recorded so nobody re-litigates them:
   rows. Two lines is upstream's empty-meta-line layout forced on for every thread: project and
   status above the title, no branch line. Vanilla is untouched upstream code, so the row file keeps
   upstream's card intact and the one-line row is an early return before it.
-- **One-line thread rows (36px).** An older two-line layout (title, then branch, PR and time) was
-  shipped and reverted: it showed fewer threads without adding useful information. Rows show no times.
-- **Row order:** project icon, title, PR and terminal badges, then the status icon at the right
-  edge. Status icons line up on the right; badges shift left only on rows that have a status.
+- **One-line thread rows (36px with their padding).** An older two-line layout (title, then
+  branch, PR and time) was shipped and reverted: it showed fewer threads without adding useful
+  information. Rows show no times, pull requests or terminals: Brandon only needs the title,
+  project and status. The 36px total matches upstream's slim rows, which the drag projection in
+  `Sidebar.drag.ts` scales from, so don't change it without checking a drag.
+- **Row order:** project icon, title, then the status icon at the right edge.
   Putting the status in the project icon's slot was tried and rejected because it hid the project.
-- Hover swaps the badges and status for Snooze and Settle; a Woke alarm stays visible, and clicking
+  Replacing the status icons with coloured dots was proposed and rejected as confusing.
+- Hover swaps the status for Snooze and Settle; a Woke alarm stays visible, and clicking
   it dismisses it. The machine is in the hover tooltip, not the row.
 - **No sidebar row motion.** Upstream's slide/fade when rows reorder, appear or leave (and the
   glide after a drag-drop) is switched off in `Sidebar.tsx`; rows snap into place.
-- A hairline divider sits under the pinned threads (`apps/web/src/fork/SidebarPinnedDivider.tsx`).
+- **Every section has a label.** Pinned (when it has threads) and Active show a label and count
+  at rest, like the Snoozed and Settled shelves (`apps/web/src/fork/SidebarSectionLabel.tsx`).
+  Each fills the 24px the drag projection reserves for a boundary label, so nothing moves on
+  pickup. This replaced a hairline under the pinned threads.
 - **Prompt stashes are per project** (per environment and project, 20 each). Entries with no project
   are ignored. Upstream shares one list across every project.
 - **Subagents tab** (`apps/web/src/fork/SubagentsPanel.tsx`): a right-panel tab, opened from the
@@ -198,7 +204,7 @@ Recorded so nobody re-litigates them:
   server leaves idle subagents out of the shell stream and a thread's `subagents` only cover its
   recent turns, so the tab mounts the thread family to get them all. That's a read per thread, so a
   left-sidebar list across every thread could only show the running ones cheaply.
-- **The fork is only these rows, their setting, the pinned divider, per-project stashes and the
+- **The fork is only these rows, their setting, the section labels, per-project stashes and the
   Subagents tab.** On 2026-10-25 everything else was dropped (thread tags, project
   groups and their shortcuts, the project filter shortcut, launched-thread
   nesting, the Overview removal and the sidebar update button), because upstream covers enough of

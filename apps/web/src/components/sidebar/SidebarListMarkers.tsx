@@ -9,7 +9,7 @@ import {
   type SidebarListMarker,
 } from "../Sidebar.logic";
 import { SIDEBAR_SORTABLE_DRAG_DISABLED } from "./SidebarThreadRow";
-import { SidebarPinnedDivider } from "../../fork/SidebarPinnedDivider";
+import { SidebarSectionLabel } from "../../fork/SidebarSectionLabel";
 
 function SortableSidebarMarker(props: {
   marker: SidebarListMarker;
@@ -81,17 +81,31 @@ export function SidebarDragBoundary(props: {
   label: string;
   visible: boolean;
   isDropTarget: boolean;
-  // Fork: a divider line shown at rest. It takes no layout space, so drag
-  // measurements are unchanged; the label replaces it while dragging.
-  restDivider?: boolean;
+  // Fork: an always-visible section label with a thread count. It takes the
+  // 24px the drag projection gives a boundary label, so rows stay put on pickup.
+  rest?: { count: number };
 }) {
+  if (props.rest) {
+    return (
+      <SortableSidebarMarker
+        marker={props.marker}
+        data-testid={`sidebar-${props.marker}`}
+        className="pointer-events-none relative mx-0.5 h-6"
+      >
+        <SidebarSectionLabel
+          label={props.label}
+          count={props.rest.count}
+          isDropTarget={props.isDropTarget}
+        />
+      </SortableSidebarMarker>
+    );
+  }
   return (
     <SortableSidebarMarker
       marker={props.marker}
       data-testid={`sidebar-${props.marker}`}
       className="pointer-events-none relative mx-0.5 -mb-px h-0"
     >
-      {props.restDivider && !props.visible ? <SidebarPinnedDivider /> : null}
       {props.visible ? (
         <div className="sidebar-drag-boundary-label absolute inset-x-2 top-1 flex h-4 items-center gap-2">
           <span
