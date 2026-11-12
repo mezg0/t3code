@@ -72,10 +72,11 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
         />
       </div>
       <div className="relative z-10 flex h-8 min-w-0 flex-1 flex-wrap content-start items-center gap-x-2 overflow-hidden py-0.5">
-        <div className="flex shrink-0 items-center gap-1">
-          {/* Fork: no wordmark; the history arrows take its place beside the sidebar toggle. */}
+        {/* Fork: no wordmark. Its left margin stays here so the history arrows and the
+            environment pill still clear the window controls and the sidebar toggle. */}
+        <div className="flex shrink-0 items-center gap-1 md:ml-[var(--workspace-titlebar-content-left)]">
           {isElectron ? (
-            <div className="ml-[var(--workspace-titlebar-content-left)] hidden items-center md:flex">
+            <div className="hidden items-center md:flex">
               <HistoryNavigationButton direction="back" onBackdrop={backdropVariant !== null} />
               <HistoryNavigationButton direction="forward" onBackdrop={backdropVariant !== null} />
             </div>
