@@ -1,32 +1,6 @@
-/* Fork: with a right panel open, only the conversation stays elevated. The
-   right panel sits flat on the sidebar's surface, like the left sidebar. */
-@media (min-width: 48rem) {
-  [data-slot="sidebar-inset"]:has(> div > [data-workspace-area="panel"]) {
-    border-color: transparent;
-    background: transparent;
-    box-shadow: none;
-  }
-
-  [data-slot="sidebar-inset"]:has(> div > [data-workspace-area="panel"]) > div {
-    background: transparent;
-  }
-
-  [data-slot="sidebar-inset"] > div > [data-chat-column]:has(~ [data-workspace-area="panel"]) {
-    overflow: hidden;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-xl);
-    background: var(--background);
-  }
-
-  [data-slot="sidebar-inset"] > div > [data-workspace-area="panel"] {
-    --background: var(--sidebar);
-    border-left-width: 0;
-  }
-}
-
-/* The grain overlay brightens the sidebar a shade above the window behind it,
-   which shows as a faint box. Without it the sidebar, the gaps and the right
-   panel share one colour. */
+/* Fork: the grain overlay brightens the sidebar a shade above the window behind
+   it, which shows as a faint box. Without it the sidebar and the gaps around
+   the inset panel share one colour. */
 [data-variant="inset"] [data-slot="sidebar-inner"] {
   background-image: none;
 }

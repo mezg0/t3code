@@ -1,7 +1,7 @@
 /* Clerk injects its component styles into the clerk layer (clerkAppearance.cssLayerName). */
 @layer theme, base, clerk, components, utilities;
 @import "tailwindcss";
-/* Fork: layout overrides for the inset conversation panel. */
+/* Fork: colour fixes for the inset conversation panel. */
 @import "./fork/insetPanel.css";
 
 @custom-variant dark (&:is(.dark, .dark *));

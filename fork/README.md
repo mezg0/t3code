@@ -203,10 +203,12 @@ Recorded so nobody re-litigates them:
   The header toggle opens it per thread. Upstream starts it open; the default lives in
   `DEFAULT_THREAD_PANEL_VISIBILITY` in `apps/web/src/rightPanelStore.ts`, and only threads that
   differ from it are saved.
-- **Only the conversation is elevated** (Linear-style). The sidebar uses its `inset` variant
+- **The conversation is an inset panel** (Linear-style). The sidebar uses its `inset` variant
   (`AppSidebarLayout.tsx`), so the conversation is a rounded panel with a hairline edge and an
-  8px gap on every side. `apps/web/src/fork/insetPanel.css` keeps the right panel flat and paints
-  the window, sidebar and right panel in the theme's sidebar colour, so it works in any theme.
+  8px gap on every side. The right panel stays inside that panel: a flat right panel was shipped
+  and reverted because the browser and other tabs looked wrong on the sidebar's surface.
+  `apps/web/src/fork/insetPanel.css` paints the window and sidebar in the theme's sidebar colour,
+  so it works in any theme.
 - **Shelf rows match the one-line rows** (Working, Snoozed, Settled): same height and inset, no
   age; Snoozed keeps its wake time. Work folds have no rule under them, and the conversation's
   tick rail shows only on hover.
