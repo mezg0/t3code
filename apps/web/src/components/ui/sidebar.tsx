@@ -617,7 +617,8 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
         "relative flex min-w-0 w-full flex-1 flex-col bg-background surface-grain",
         "md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ms-2 md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ms-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm/5",
         // Fork: a hairline edge so the inset panel reads against a near-black sidebar.
-        "md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-border",
+        // Callers set a full-viewport height; auto lets the margin show at the bottom.
+        "md:peer-data-[variant=inset]:border md:peer-data-[variant=inset]:border-border md:peer-data-[variant=inset]:h-auto!",
         className,
       )}
       data-slot="sidebar-inset"
