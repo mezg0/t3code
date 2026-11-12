@@ -209,6 +209,9 @@ Recorded so nobody re-litigates them:
   and reverted because the browser and other tabs looked wrong on the sidebar's surface.
   `apps/web/src/fork/insetPanel.css` paints the window and sidebar in the theme's sidebar colour,
   so it works in any theme.
+- **No wordmark in the sidebar header.** The history arrows sit beside the sidebar toggle, on the
+  traffic lights' line. `insetPanel.css` removes the inset variant's sidebar padding to keep that
+  line, and moves the top-right panel toggles in to line up with the breadcrumb.
 - **Shelf rows match the one-line rows** (Working, Snoozed, Settled): same height and inset, no
   age; Snoozed keeps its wake time. Work folds have no rule under them, and the conversation's
   tick rail shows only on hover.

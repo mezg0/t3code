@@ -12,3 +12,18 @@
     background: var(--sidebar);
   }
 }
+
+/* The inset variant pads the sidebar, which pushed its header out of line with
+   the window controls. The panel's own margin already provides the gap. */
+[data-variant="inset"] [data-slot="sidebar-container"] {
+  padding: 0;
+}
+
+/* The panel toggles are fixed to the window corner. Inside the inset panel they
+   move in by its margin and border so they line up with the breadcrumb. */
+@media (min-width: 48rem) {
+  main[data-slot="sidebar-inset"] [data-workspace-titlebar-controls] {
+    top: calc(var(--workspace-controls-top) + 0.5rem + 1px);
+    right: calc(var(--workspace-controls-right) + 0.5rem + 1px);
+  }
+}
