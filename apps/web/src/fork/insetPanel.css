@@ -23,3 +23,18 @@
     border-left-width: 0;
   }
 }
+
+/* The grain overlay brightens the sidebar a shade above the window behind it,
+   which shows as a faint box. Without it the sidebar, the gaps and the right
+   panel share one colour. */
+[data-variant="inset"] [data-slot="sidebar-inner"] {
+  background-image: none;
+}
+
+/* Themes may give the window a different colour from the sidebar. The inset
+   layout needs them equal, so the window behind the panel takes the sidebar's. */
+@media (min-width: 48rem) {
+  div:has(> main[data-slot="sidebar-inset"]) {
+    background: var(--sidebar);
+  }
+}
