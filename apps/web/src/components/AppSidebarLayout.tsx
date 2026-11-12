@@ -465,6 +465,8 @@ export function AppSidebarLayout({
             <SidebarBrandWidthProbe isElectron={isElectron} onWidthChange={setBrandWidth} />
             <Sidebar
               side="left"
+              // Fork: the conversation sits in an inset panel on the sidebar's surface.
+              variant="inset"
               collapsible="offcanvas"
               data-app-sidebar=""
               {...sidebarArea}
