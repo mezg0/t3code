@@ -195,7 +195,13 @@ Recorded so nobody re-litigates them:
 - **Every section has a label.** Pinned (when it has threads) and Active show a label and count
   at rest, like the Snoozed and Settled shelves (`apps/web/src/fork/SidebarSectionLabel.tsx`).
   Each fills the 24px the drag projection reserves for a boundary label, so nothing moves on
-  pickup. This replaced a hairline under the pinned threads.
+  pickup. This replaced a hairline under the pinned threads. Clicking a label collapses its
+  section (open by default, remembered in local storage); a collapsed section still shows the
+  open thread and still accepts drops.
+- **The thread details card starts hidden** on every thread (the top-right card with git actions).
+  The header toggle opens it per thread. Upstream starts it open; the default lives in
+  `DEFAULT_THREAD_PANEL_VISIBILITY` in `apps/web/src/rightPanelStore.ts`, and only threads that
+  differ from it are saved.
 - **Prompt stashes are per project** (per environment and project, 20 each). Entries with no project
   are ignored. Upstream shares one list across every project.
 - **Subagents tab** (`apps/web/src/fork/SubagentsPanel.tsx`): a right-panel tab, opened from the

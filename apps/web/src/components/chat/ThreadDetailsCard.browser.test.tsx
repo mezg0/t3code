@@ -22,6 +22,9 @@ const placement = { x: 908, y: 0, right: 12, width: 280, height: 400 } as const;
 
 function setup() {
   useRightPanelStore.setState({ threadPanelVisibilityByThreadKey: {} });
+  // Fork: the card starts hidden, so these tests open it inline first.
+  for (const threadRef of [threadA, threadB])
+    useRightPanelStore.getState().setThreadPanelOpen(threadRef, "inline", true);
   const anchor = document.createElement("div");
   document.body.append(anchor);
   return {

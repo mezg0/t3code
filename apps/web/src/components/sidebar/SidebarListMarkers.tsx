@@ -81,20 +81,22 @@ export function SidebarDragBoundary(props: {
   label: string;
   visible: boolean;
   isDropTarget: boolean;
-  // Fork: an always-visible section label with a thread count. It takes the
-  // 24px the drag projection gives a boundary label, so rows stay put on pickup.
-  rest?: { count: number };
+  // Fork: an always-visible, collapsible section label with a thread count. It takes
+  // the 24px the drag projection gives a boundary label, so rows stay put on pickup.
+  rest?: { count: number; expanded: boolean; onToggle: () => void };
 }) {
   if (props.rest) {
     return (
       <SortableSidebarMarker
         marker={props.marker}
         data-testid={`sidebar-${props.marker}`}
-        className="pointer-events-none relative mx-0.5 h-6"
+        className="relative mx-0.5 h-6"
       >
         <SidebarSectionLabel
           label={props.label}
           count={props.rest.count}
+          expanded={props.rest.expanded}
+          onToggle={props.rest.onToggle}
           isDropTarget={props.isDropTarget}
         />
       </SortableSidebarMarker>
