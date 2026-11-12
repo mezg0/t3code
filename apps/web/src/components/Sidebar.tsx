@@ -3567,7 +3567,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarDragBoundary
                                 key="pinned-divider"
                                 marker="pinned-divider"
-                                label="Active"
+                                label="Idle"
                                 visible={from !== null}
                                 rest={{
                                   count: activeThreads.length,
@@ -3583,7 +3583,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionPlaceholder
                                 key="active-placeholder"
                                 marker="active-placeholder"
-                                label="Active"
+                                label="Idle"
                                 showHint={
                                   from !== null &&
                                   (activeThreads.length === 0 ||

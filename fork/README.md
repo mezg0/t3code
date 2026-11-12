@@ -192,7 +192,8 @@ Recorded so nobody re-litigates them:
   it dismisses it. The machine is in the hover tooltip, not the row.
 - **No sidebar row motion.** Upstream's slide/fade when rows reorder, appear or leave (and the
   glide after a drag-drop) is switched off in `Sidebar.tsx`; rows snap into place.
-- **Every section has a label.** Pinned (when it has threads) and Active show a label and count
+- **Every section has a label.** Pinned (when it has threads) and Idle (the active section,
+  renamed so it doesn't read like Working) show a label and count
   at rest, like the Snoozed and Settled shelves (`apps/web/src/fork/SidebarSectionLabel.tsx`).
   Each fills the 24px the drag projection reserves for a boundary label, so nothing moves on
   pickup. This replaced a hairline under the pinned threads. Clicking a label collapses its
