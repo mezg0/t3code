@@ -1,0 +1,25 @@
+/* Fork: with a right panel open, only the conversation stays elevated. The
+   right panel sits flat on the sidebar's surface, like the left sidebar. */
+@media (min-width: 48rem) {
+  [data-slot="sidebar-inset"]:has(> div > [data-workspace-area="panel"]) {
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  [data-slot="sidebar-inset"]:has(> div > [data-workspace-area="panel"]) > div {
+    background: transparent;
+  }
+
+  [data-slot="sidebar-inset"] > div > [data-chat-column]:has(~ [data-workspace-area="panel"]) {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--background);
+  }
+
+  [data-slot="sidebar-inset"] > div > [data-workspace-area="panel"] {
+    --background: var(--sidebar);
+    border-left-width: 0;
+  }
+}
