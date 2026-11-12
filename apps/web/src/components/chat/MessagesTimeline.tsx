@@ -1624,7 +1624,8 @@ function TurnFoldTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "turn-
   );
 
   return (
-    <div className="group/timeline-row border-b border-border/60 pb-2 pe-0.5 pt-1">
+    // Fork: no rule under the fold line; the muted text separates it enough.
+    <div className="group/timeline-row pb-1 pe-0.5 pt-1">
       <div className="relative flex items-center gap-1">
         <button
           type="button"

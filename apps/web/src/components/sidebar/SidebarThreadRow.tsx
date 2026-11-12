@@ -1210,6 +1210,8 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   if (variant !== "card") {
     const multiline = variant === "folder-multiline";
     const inFolder = variant === "folder" || multiline;
+    // Fork: shelf rows take the one-line row's size and inset, and drop their age.
+    const oneLineShelf = variant === "slim" && rowStyle === "one-line";
     return (
       <li
         data-thread-item={threadKey}
@@ -1218,6 +1220,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
         className={cn(
           "list-none [content-visibility:auto] [contain-intrinsic-size:auto_--spacing(9)]",
           metaLine !== null && multiline && "[contain-intrinsic-size:auto_--spacing(13.5)]",
+          oneLineShelf && "py-0.5",
           sortable?.isDragging && "relative z-20",
         )}
       >
@@ -1238,7 +1241,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                   rowSurfaceClassName,
                   multiline
                     ? "flex flex-col justify-center px-2.5 py-1.5"
-                    : "flex h-9 items-center gap-2.5 px-2.5",
+                    : oneLineShelf
+                      ? "flex h-8 items-center gap-1.5 px-(--sidebar-row-content-inset)"
+                      : "flex h-9 items-center gap-2.5 px-2.5",
                   // Lines titles up with the folder name, past its chevron and icon.
                   inFolder && "ps-9",
                 )}
@@ -1280,7 +1285,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
               ) : (
                 <span
                   className={cn(
-                    "relative ml-auto flex h-6 min-w-8 shrink-0 items-center justify-end",
+                    "relative ml-auto flex h-6 shrink-0 items-center justify-end",
+                    // Fork: with no age to show, the title runs to the edge until hover.
+                    oneLineShelf ? "group-any-hover/sidebar-row:min-w-8" : "min-w-8",
                     props.sweepAction !== null && "hidden",
                     jumpHintLabel && JUMP_HINT_SLOT_CLASS_NAME,
                   )}
@@ -1325,7 +1332,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
                         <TopStatusIcon icon={topStatus.icon} className="size-3" />
                         {topStatus.label}
                       </span>
-                    ) : (
+                    ) : oneLineShelf ? null : (
                       <span className="text-xs">
                         <RelativeTimeLabel
                           timestamp={
