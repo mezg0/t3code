@@ -10,12 +10,6 @@
   --fork-fill-2: color-mix(in srgb, var(--foreground) 9%, transparent);
 }
 
-/* A shorter line: about 85 characters at the default size. The wide and full
-   chat width settings still apply. */
-:root:not([data-chat-width="wide"], [data-chat-width="full"]) {
-  --chat-content-max-width: 38rem;
-}
-
 /* Surfaces. */
 @media (min-width: 48rem) {
   main[data-slot="sidebar-inset"] {

@@ -216,13 +216,13 @@ Recorded so nobody re-litigates them:
   age; Snoozed keeps its wake time. Work folds have no rule under them, and the conversation's
   tick rail shows only on hover.
 - **One consistency pass** (`apps/web/src/fork/finesse.css`): three text levels, one radius scale
-  (16px surfaces, 8px rows, 5px chips), three type sizes, two fills, a 38rem reading column
-  (the wide and full chat width settings still apply), near-equal space around user messages,
+  (16px surfaces, 8px rows, 5px chips), three type sizes, two fills, near-equal space around user messages,
   borderless inline code, a search that looks like a field, and quieter secondary icons and
   composer controls. The composer placeholder is just "Ask anything". Sizes are in rem so the
   interface font size setting still applies. Two traps: style a user message's bubble by class,
   never by child position (steer markers and media come first), and leave the composer at 16px
-  (its outline and backdrop are separate layers at that radius).
+  (its outline and backdrop are separate layers at that radius). The reading column stays at
+  upstream's 46rem: a narrower one was tried and rejected.
 - **Prompt stashes are per project** (per environment and project, 20 each). Entries with no project
   are ignored. Upstream shares one list across every project.
 - **Subagents tab** (`apps/web/src/fork/SubagentsPanel.tsx`): a right-panel tab, opened from the
