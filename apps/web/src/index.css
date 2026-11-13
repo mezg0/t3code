@@ -5,8 +5,6 @@
 @import "./fork/insetPanel.css";
 /* Fork: consistent type, radius and spacing across the chat window. */
 @import "./fork/finesse.css";
-/* Fork: key-point highlights in finished replies. */
-@import "./fork/keyPoints.css";
 
 @custom-variant dark (&:is(.dark, .dark *));
 @custom-variant light (&:not(.dark, .dark *));

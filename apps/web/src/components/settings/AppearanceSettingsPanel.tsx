@@ -26,7 +26,6 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../
 import { Switch } from "../ui/switch";
 import { ThemeLibrary } from "./ThemeSettings";
 import { SidebarRowStyleSettingsRow } from "../../fork/SidebarRowStyle";
-import { KeyPointsSettingsRow } from "../../fork/KeyPoints";
 import {
   SettingResetButton,
   SettingsPageContainer,
@@ -351,7 +350,6 @@ export function AppearanceSettingsPanel() {
           }
         />
         <SidebarRowStyleSettingsRow />
-        <KeyPointsSettingsRow />
         <AdvancedSettings
           targetIds={[
             searchableSetting("panel-animations").id,

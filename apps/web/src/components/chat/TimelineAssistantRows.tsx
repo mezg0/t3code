@@ -23,11 +23,9 @@ import { formatChatTimestampTooltip, formatDayAwareTimestamp } from "../../times
 import { useV2ItemSupport } from "../../state/v2ItemSupport";
 import { TimelineRowCtx, TimelineRowActivityCtx, type TimelineRow } from "./timelineRowContext";
 import { MESSAGE_HEADING_LEVEL, MessageAuthorHeading } from "./TimelineRowParts";
-import { KeyPointsCard } from "../../fork/KeyPoints";
 
 export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
-  const activity = use(TimelineRowActivityCtx);
   // The timeline holds a streaming message's row while only its text grows.
   const liveText = useAssistantMessageText(
     row.message.streaming ? ctx.threadRef : null,
@@ -62,19 +60,6 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
             />
           </AssistantCitationSource>
         </div>
-        {/* Fork: a cheap model's list of what must not be missed in the finished reply. */}
-        <KeyPointsCard
-          messageId={row.message.id}
-          environmentId={ctx.activeThreadEnvironmentId}
-          text={messageText}
-          settled={!row.message.streaming}
-          generate={
-            row.showAssistantMeta &&
-            !activity.isWorking &&
-            row.message.runId !== null &&
-            row.message.runId === activity.latestRunId
-          }
-        />
         {ctx.onOpenTurnDiff ? (
           <AssistantChangedFilesSection
             turnSummary={row.assistantTurnDiffSummary}
