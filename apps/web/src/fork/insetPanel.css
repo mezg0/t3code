@@ -30,9 +30,9 @@
 
 /* The built-in browser is a fixed layer over the right panel, so the panel's
    rounded corner does not clip it. Rounding its own bottom-right corner (the
-   panel's 16px less its 1px border) stops the page poking out. */
+   panel's 8px less its 1px border) stops the page poking out. */
 @media (min-width: 48rem) {
   [data-preview-viewport] {
-    border-bottom-right-radius: 15px;
+    border-bottom-right-radius: 7px;
   }
 }

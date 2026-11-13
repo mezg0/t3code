@@ -216,7 +216,8 @@ Recorded so nobody re-litigates them:
   age; Snoozed keeps its wake time. Work folds have no rule under them, and the conversation's
   tick rail shows only on hover.
 - **One consistency pass** (`apps/web/src/fork/finesse.css`): three text levels, one radius scale
-  (16px surfaces, 8px rows, 5px chips), three type sizes, two fills, near-equal space around user messages,
+  (16px composer and bubbles, 8px panel and rows, 5px chips; the panel is 8px so it stays
+  concentric with the macOS window corner across the 8px gap), three type sizes, two fills, near-equal space around user messages,
   borderless inline code, a search that looks like a field, and quieter secondary icons and
   composer controls. The composer placeholder is just "Ask anything". Sizes are in rem so the
   interface font size setting still applies. Two traps: style a user message's bubble by class,

@@ -1,5 +1,5 @@
 /* Fork: one consistency pass over the chat window. Three text levels, one
-   radius scale (16px surfaces, 8px rows, 5px chips), three type sizes (11.5,
+   radius scale (16px floating surfaces, 8px panel and rows, 5px chips), three type sizes (11.5,
    13 and 15px at the default setting) and quieter secondary controls. Sizes are in rem so they follow the interface font size setting. */
 :root {
   --fork-text-2: color-mix(in srgb, var(--foreground) 80%, var(--background));
@@ -12,8 +12,9 @@
 
 /* Surfaces. */
 @media (min-width: 48rem) {
+  /* Concentric with the macOS window: its ~16px corner less the 8px gap. */
   main[data-slot="sidebar-inset"] {
-    border-radius: 16px;
+    border-radius: 8px;
     border-color: var(--fork-hairline);
   }
 }
