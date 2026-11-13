@@ -215,6 +215,11 @@ Recorded so nobody re-litigates them:
 - **Shelf rows match the one-line rows** (Working, Snoozed, Settled): same height and inset, no
   age; Snoozed keeps its wake time. Work folds have no rule under them, and the conversation's
   tick rail shows only on hover.
+- **One consistency pass** (`apps/web/src/fork/finesse.css`): three text levels, one radius scale
+  (14px surfaces, 8px rows, 5px chips), equal space around user messages, borderless inline code,
+  a search that looks like a field, and quieter secondary icons and composer controls. The
+  composer placeholder is just "Ask anything". Sizes are in rem so the interface font size
+  setting still applies.
 - **Prompt stashes are per project** (per environment and project, 20 each). Entries with no project
   are ignored. Upstream shares one list across every project.
 - **Subagents tab** (`apps/web/src/fork/SubagentsPanel.tsx`): a right-panel tab, opened from the
