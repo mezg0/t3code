@@ -51,7 +51,8 @@
   font-size: 0.8125rem;
 }
 
-[data-sidebar-row] :is(svg, img) {
+/* Not the provider icon: it carries its own badge and sizing. */
+[data-sidebar-row] :is(svg, img):not([data-provider-accent-color] *) {
   width: 14px;
   height: 14px;
 }
@@ -231,20 +232,20 @@ li:has(> [data-sidebar-row^="shelf:"]) {
   padding-inline: 0;
 }
 
-/* Composer footer: the model and mode controls take one quiet weight. Scoped to
-   those controls so the send, stop and queue buttons keep their own colours. */
-[data-chat-composer-controls="footer"] * {
+/* Composer footer: the model and mode labels take one quiet weight. Only the
+   labels are targeted: a blanket rule also restyled the provider icon's tiny
+   instance badge. */
+[data-chat-composer-controls="footer"]
+  :is([data-chat-provider-model-picker-label], [data-composer-control-label]),
+[data-chat-composer-controls="footer"]
+  :is([data-chat-provider-model-picker-label], [data-composer-control-label])
+  * {
   font-weight: 400;
   font-size: 0.8125rem;
 }
 
 [data-chat-composer-controls="footer"] button {
   color: var(--fork-text-2);
-}
-
-[data-chat-composer-controls="footer"] svg {
-  width: 15px;
-  height: 15px;
 }
 
 /* The compact toggle keeps a faint fill when on, but stays quieter than send. */
@@ -261,21 +262,6 @@ li:has(> [data-sidebar-row^="shelf:"]) {
 [data-chat-composer-compact-send] button[aria-pressed] .text-muted-foreground {
   font-size: 0.71875rem;
   color: var(--fork-text-3);
-}
-
-/* The provider mark is a solid shape; a touch smaller matches the outline icons. */
-[data-chat-composer-controls="footer"] [data-chat-provider-model-picker-icon] svg {
-  width: 13px;
-  height: 13px;
-}
-
-[data-chat-composer-compact-send] button[aria-pressed] {
-  border-radius: 8px;
-}
-
-/* Send sits as far from the corner as the attach icon does. */
-[data-chat-composer-footer] {
-  padding: 0 0.75rem 0.75rem 0.5rem;
 }
 
 /* One resting line instead of two. */
