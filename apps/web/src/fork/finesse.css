@@ -159,18 +159,19 @@
   color: var(--fork-text-3);
 }
 
-/* Composer footer: one quiet weight. */
-[data-chat-composer-footer] * {
+/* Composer footer: the model and mode controls take one quiet weight. Scoped to
+   those controls so the send, stop and queue buttons keep their own colours. */
+[data-chat-composer-controls="footer"] * {
   font-weight: 400;
   font-size: 0.8125rem;
   color: var(--fork-text-3);
 }
 
-[data-chat-composer-footer] [data-chat-provider-model-picker-label] * {
+[data-chat-composer-controls="footer"] [data-chat-provider-model-picker-label] * {
   color: var(--fork-text-2);
 }
 
-[data-chat-composer-footer] svg {
+[data-chat-composer-controls="footer"] svg {
   width: 15px;
   height: 15px;
 }
