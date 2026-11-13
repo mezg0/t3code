@@ -1,0 +1,59 @@
+/* Fork: key-point highlights painted over a reply's own sentences. Blue asks
+   something of you, amber is a warning, grey is the main result. */
+::highlight(t3-fork-key-point-ask) {
+  color: var(--foreground);
+  background-color: color-mix(in srgb, var(--primary) 24%, transparent);
+}
+
+::highlight(t3-fork-key-point-watch) {
+  color: var(--foreground);
+  background-color: color-mix(in srgb, var(--warning) 22%, transparent);
+}
+
+::highlight(t3-fork-key-point-key) {
+  color: var(--foreground);
+  background-color: color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
+/* The legend above the reply: one entry per kind, each a jump to its first mark. */
+.fork-key-points-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.875rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.fork-key-points-legend button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.fork-key-points-legend button:hover {
+  color: var(--foreground);
+}
+
+.fork-key-points-legend button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.fork-key-points-legend button::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--foreground) 30%, transparent);
+}
+
+.fork-key-points-legend button[data-kind="ask"]::before {
+  background: color-mix(in srgb, var(--primary) 60%, transparent);
+}
+
+.fork-key-points-legend button[data-kind="watch"]::before {
+  background: color-mix(in srgb, var(--warning) 60%, transparent);
+}

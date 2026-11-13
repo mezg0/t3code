@@ -23,9 +23,11 @@ import { formatChatTimestampTooltip, formatDayAwareTimestamp } from "../../times
 import { useV2ItemSupport } from "../../state/v2ItemSupport";
 import { TimelineRowCtx, TimelineRowActivityCtx, type TimelineRow } from "./timelineRowContext";
 import { MESSAGE_HEADING_LEVEL, MessageAuthorHeading } from "./TimelineRowParts";
+import { KeyPointHighlights } from "../../fork/KeyPoints";
 
 export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
+  const activity = use(TimelineRowActivityCtx);
   // The timeline holds a streaming message's row while only its text grows.
   const liveText = useAssistantMessageText(
     row.message.streaming ? ctx.threadRef : null,
@@ -39,26 +41,39 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
       <div className="relative min-w-0 px-1 py-0.5">
         <MessageAuthorHeading>T3 Code</MessageAuthorHeading>
         <div data-thread-find-text="true">
-          <AssistantCitationSource
+          {/* Fork: highlights the sentences a cheap model picked out of the finished reply. */}
+          <KeyPointHighlights
             messageId={row.message.id}
-            {...(ctx.threadRef ? { threadRef: ctx.threadRef } : {})}
-            itemKey={row.id}
-            request={ctx.citationRequest}
-            listRef={ctx.listRef}
+            environmentId={ctx.activeThreadEnvironmentId}
+            settled={!row.message.streaming}
+            generate={
+              row.showAssistantMeta &&
+              !activity.isWorking &&
+              row.message.runId !== null &&
+              row.message.runId === activity.latestRunId
+            }
           >
-            <ChatMarkdown
-              text={messageText}
-              cwd={ctx.markdownCwd}
-              threadRef={ctx.threadRef ?? undefined}
-              isStreaming={Boolean(row.message.streaming)}
-              lineBreaks={shouldPreserveAssistantLineBreaks(messageText)}
-              skills={ctx.skills}
-              headingLevelOffset={MESSAGE_HEADING_LEVEL}
-              onUseArtifactTemplate={ctx.onUseArtifactTemplate}
-              onRunShellCommand={ctx.onRunShellCommand}
-              onImageExpand={ctx.onImageExpand}
-            />
-          </AssistantCitationSource>
+            <AssistantCitationSource
+              messageId={row.message.id}
+              {...(ctx.threadRef ? { threadRef: ctx.threadRef } : {})}
+              itemKey={row.id}
+              request={ctx.citationRequest}
+              listRef={ctx.listRef}
+            >
+              <ChatMarkdown
+                text={messageText}
+                cwd={ctx.markdownCwd}
+                threadRef={ctx.threadRef ?? undefined}
+                isStreaming={Boolean(row.message.streaming)}
+                lineBreaks={shouldPreserveAssistantLineBreaks(messageText)}
+                skills={ctx.skills}
+                headingLevelOffset={MESSAGE_HEADING_LEVEL}
+                onUseArtifactTemplate={ctx.onUseArtifactTemplate}
+                onRunShellCommand={ctx.onRunShellCommand}
+                onImageExpand={ctx.onImageExpand}
+              />
+            </AssistantCitationSource>
+          </KeyPointHighlights>
         </div>
         {ctx.onOpenTurnDiff ? (
           <AssistantChangedFilesSection
