@@ -224,17 +224,17 @@ Recorded so nobody re-litigates them:
   never by child position (steer markers and media come first), and leave the composer at 16px
   (its outline and backdrop are separate layers at that radius). The reading column stays at
   upstream's 46rem: a narrower one was tried and rejected.
-- **Key-point highlights** (`apps/web/src/fork/KeyPoints.tsx`, `keyPointsLogic.ts`): when a turn
-  finishes, a cheap model picks the sentences in the final reply that must not be missed
-  (questions for you, the main result, caveats) and the app highlights them in place, with a
-  small legend above the reply that jumps to each. Frontend only: the request borrows the voice
-  clean-up endpoint (`/api/voice/post-process`), which runs the text generation model on
-  instructions the client supplies; the instructions open by overriding the transcript wording
-  the server wraps around them. The model must quote the reply verbatim, and a quote that does
-  not match the rendered text is dropped, so a highlight can never say something the agent did
-  not. Results are cached per device in localStorage. Only the latest finished reply of the open
-  thread is sent (replies over ~600 characters). Toggle: Settings → Appearance → Highlight key
-  points. Chosen over a summary card, a strip above the composer and margin notes.
+- **Key points card** (`apps/web/src/fork/KeyPoints.tsx`, `keyPointsLogic.ts`): when a turn
+  finishes, a cheap model lists what must not be missed in the final reply (what it needs from
+  you, the main result, caveats) and the app shows it in a small card under that reply. Frontend
+  only: the request borrows the voice clean-up endpoint (`/api/voice/post-process`), which runs
+  the text generation model on instructions the client supplies; the instructions open by
+  overriding the transcript wording the server wraps around them. The thread's own environment
+  is asked first and any other connected one after it, because a server that is older or has no
+  text model fails the request. Results are cached per device in localStorage. Only the latest
+  finished reply of the open thread is sent (replies over ~1,200 characters). Toggle: Settings →
+  Appearance → Key points card. In-place highlights of the reply's own sentences shipped first
+  and were rejected; a strip above the composer and margin notes were also considered.
 - **Prompt stashes are per project** (per environment and project, 20 each). Entries with no project
   are ignored. Upstream shares one list across every project.
 - **Subagents tab** (`apps/web/src/fork/SubagentsPanel.tsx`): a right-panel tab, opened from the
