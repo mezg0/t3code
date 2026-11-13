@@ -1,33 +1,41 @@
 /* Fork: one consistency pass over the chat window. Three text levels, one
-   radius scale (14px surfaces, 8px rows, 5px chips) and quieter secondary
-   controls. Sizes are in rem so they follow the interface font size setting. */
+   radius scale (16px surfaces, 8px rows, 5px chips), three type sizes (11.5,
+   13 and 15px at the default setting) and quieter secondary controls. Sizes are in rem so they follow the interface font size setting. */
 :root {
   --fork-text-2: color-mix(in srgb, var(--foreground) 80%, var(--background));
-  --fork-text-3: color-mix(in srgb, var(--foreground) 46%, var(--background));
+  --fork-text-3: var(--muted-foreground);
   --fork-hairline: color-mix(in srgb, var(--foreground) 9%, transparent);
+  /* Two fills: resting fields, and selected or "on" things. */
+  --fork-fill-1: color-mix(in srgb, var(--foreground) 5%, transparent);
+  --fork-fill-2: color-mix(in srgb, var(--foreground) 9%, transparent);
+}
+
+/* A shorter line: about 85 characters at the default size. The wide and full
+   chat width settings still apply. */
+:root:not([data-chat-width="wide"], [data-chat-width="full"]) {
+  --chat-content-max-width: 38rem;
 }
 
 /* Surfaces. */
 @media (min-width: 48rem) {
   main[data-slot="sidebar-inset"] {
-    border-radius: 14px;
+    border-radius: 16px;
     border-color: var(--fork-hairline);
   }
 }
 
+/* The composer keeps upstream's 16px radius: its outline and glass backdrop are
+   separate layers drawn at that radius, and a different surface radius shows
+   as a mismatched corner. */
 [data-chat-composer-surface] {
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--foreground) 4%, var(--background));
-  box-shadow:
-    0 0 0 1px var(--fork-hairline),
-    0 10px 30px -14px color-mix(in srgb, black 80%, transparent);
+  background: color-mix(in srgb, var(--foreground) 5%, var(--background));
 }
 
 /* Class hooks, not child positions: a user message can have a steer marker,
    attribution or media ahead of its bubble. */
 [data-message-role="user"] .bg-message.p-3 {
   padding: 0.5rem 0.875rem;
-  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+  background: var(--fork-fill-2);
 }
 
 /* Sidebar. */
@@ -36,11 +44,11 @@
 }
 
 [data-sidebar-row][aria-current] {
-  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+  background: var(--fork-fill-2);
 }
 
 [data-sidebar-row-title] {
-  font-size: 0.84375rem;
+  font-size: 0.8125rem;
 }
 
 [data-sidebar-row] :is(svg, img) {
@@ -53,8 +61,30 @@
   border-radius: 4px;
 }
 
-[data-sidebar-row]:not([aria-current]) svg {
-  opacity: 0.55;
+/* Receded rows (settled, snoozed) dim and desaturate their icon upstream. That
+   suits image tiles; outline glyphs take the muted text colour instead, so they
+   stay legible and keep the theme's hue. */
+[data-sidebar-row]:not(:hover, :focus-within) .opacity-40.grayscale {
+  opacity: 0.6;
+}
+
+[data-sidebar-row]:not(:hover, :focus-within) .opacity-40.grayscale:has(svg) {
+  opacity: 1;
+  filter: none;
+}
+
+[data-sidebar-row]:not(:hover, :focus-within) .opacity-40.grayscale :is(span, svg) {
+  color: var(--fork-text-3);
+}
+
+/* Shelf headers match the section labels: same chevron, same count edge. */
+[data-sidebar-row^="shelf:"] svg {
+  width: 12px;
+  height: 12px;
+}
+
+[data-sidebar-row]:not([aria-current], :hover) img {
+  opacity: 0.8;
 }
 
 .sidebar-drag-boundary-label,
@@ -66,14 +96,35 @@
   color: var(--fork-text-3) !important;
 }
 
+/* Fill only, no ring: the selected row is the one outlined-looking thing. The
+   extra 2px puts the search icon on the row icons' centre line. */
 [data-sidebar-search] {
-  background: color-mix(in srgb, var(--foreground) 5%, transparent);
+  background: var(--fork-fill-1);
   border-radius: 8px;
-  box-shadow: inset 0 0 0 1px var(--fork-hairline);
+  padding-left: 0.625rem;
+}
+
+[data-sidebar-search] + div {
+  margin-right: 2px;
+}
+
+[data-slot="sidebar-footer"] {
+  padding-left: calc(var(--sidebar-content-inset) + 2px);
+}
+
+/* Section labels sit nearer their own rows than the group above. The boxes
+   keep their height (drag projection depends on it); only the text moves. */
+.sidebar-drag-boundary-label > * {
+  transform: translateY(4px);
+}
+
+/* Shelf headers are 8px taller than section labels, so they move further. */
+li:has(> [data-sidebar-row^="shelf:"]) {
+  transform: translateY(8px);
 }
 
 [data-sidebar-search] input {
-  font-size: 0.84375rem;
+  font-size: 0.8125rem;
 }
 
 [data-slot="sidebar-inner"]
@@ -82,8 +133,17 @@
     [aria-label="Add project"],
     [aria-label^="New thread"]
   ),
-[data-slot="sidebar-footer"] button,
-[data-panel-layout-controls] button {
+[data-slot="sidebar-footer"] button {
+  color: var(--fork-text-3);
+}
+
+[data-panel-layout-controls] button:not([aria-pressed="true"]) {
+  color: var(--fork-text-3) !important;
+}
+
+[data-sidebar-search],
+[data-sidebar-search] input::placeholder,
+[data-sidebar-row$=":more"] {
   color: var(--fork-text-3);
 }
 
@@ -98,6 +158,8 @@
 [data-panel-layout-controls] svg {
   width: 15px;
   height: 15px;
+  /* Upstream gives these glyphs a darker colour of their own. */
+  color: inherit;
 }
 
 [data-slot="sidebar-footer"] button[aria-label^="Update"] {
@@ -106,7 +168,7 @@
 
 /* Header. */
 [data-chat-header] [data-slot="workspace-breadcrumb-text"] {
-  font-size: 0.84375rem;
+  font-size: 0.8125rem;
 }
 
 /* Conversation: body text one step below bold lead-ins and your own messages. */
@@ -129,6 +191,19 @@
   color: var(--foreground) !important;
 }
 
+/* File link glyphs are solid shapes; smaller and in the link colour they stop
+   outweighing the text. */
+.chat-markdown a svg[data-pierre-icon] {
+  width: 0.8em;
+  height: 0.8em;
+  color: currentColor !important;
+}
+
+/* Web links and file links share the theme's accent. */
+.chat-markdown a[href] {
+  color: var(--primary) !important;
+}
+
 .chat-markdown blockquote {
   border-left-width: 2px !important;
   border-color: var(--fork-hairline) !important;
@@ -146,8 +221,14 @@
 }
 
 [data-timeline-row-kind="turn-fold"] button {
-  font-size: 0.78125rem;
+  padding-left: 0;
+  font-size: 0.8125rem;
   color: var(--fork-text-3);
+}
+
+/* Assistant text, work folds and the composer share one left edge. */
+[data-message-role="assistant"] > div {
+  padding-inline: 0;
 }
 
 /* Composer footer: the model and mode controls take one quiet weight. Scoped to
@@ -155,16 +236,51 @@
 [data-chat-composer-controls="footer"] * {
   font-weight: 400;
   font-size: 0.8125rem;
-  color: var(--fork-text-3);
 }
 
-[data-chat-composer-controls="footer"] [data-chat-provider-model-picker-label] * {
+[data-chat-composer-controls="footer"] button {
   color: var(--fork-text-2);
 }
 
 [data-chat-composer-controls="footer"] svg {
   width: 15px;
   height: 15px;
+}
+
+/* The compact toggle keeps a faint fill when on, but stays quieter than send. */
+[data-chat-composer-compact-send] button[aria-pressed] {
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: var(--fork-text-2);
+}
+
+[data-chat-composer-compact-send] button[aria-pressed="true"]:not(:hover) {
+  background: var(--fork-fill-2);
+}
+
+[data-chat-composer-compact-send] button[aria-pressed] .text-muted-foreground {
+  font-size: 0.71875rem;
+  color: var(--fork-text-3);
+}
+
+/* The provider mark is a solid shape; a touch smaller matches the outline icons. */
+[data-chat-composer-controls="footer"] [data-chat-provider-model-picker-icon] svg {
+  width: 13px;
+  height: 13px;
+}
+
+[data-chat-composer-compact-send] button[aria-pressed] {
+  border-radius: 8px;
+}
+
+/* Send sits as far from the corner as the attach icon does. */
+[data-chat-composer-footer] {
+  padding: 0 0.75rem 0.75rem 0.5rem;
+}
+
+/* One resting line instead of two. */
+.composer-tiptap {
+  min-height: calc(1lh + 1rem);
 }
 
 /* The conversation scrollbar shows only while the pointer is over it. */
@@ -174,4 +290,14 @@
 
 .messages-timeline-scroll:hover {
   scrollbar-color: var(--fork-hairline) transparent !important;
+}
+
+/* "Show N more" lines its text up with the row titles above it. */
+[data-sidebar-row$=":more"] {
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+}
+
+[data-sidebar-row$=":more"] svg {
+  margin: 0 1px;
 }
