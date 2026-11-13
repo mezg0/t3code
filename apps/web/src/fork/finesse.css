@@ -23,8 +23,9 @@
     0 10px 30px -14px color-mix(in srgb, black 80%, transparent);
 }
 
-[data-message-role="user"] > div > div:first-child {
-  border-radius: 14px;
+/* Class hooks, not child positions: a user message can have a steer marker,
+   attribution or media ahead of its bubble. */
+[data-message-role="user"] .bg-message.p-3 {
   padding: 0.5rem 0.875rem;
   background: color-mix(in srgb, var(--foreground) 8%, transparent);
 }
@@ -133,25 +134,15 @@
   border-color: var(--fork-hairline) !important;
 }
 
-/* Equal space above and below a user message. The hover row under the bubble
-   (time, copy, edit) floats, so it no longer adds height to one side only. */
-[data-message-role="assistant"] {
+/* Near-equal space above and below a user message. Both neighbours reserve a
+   hidden hover row, so only the rows' own bottom padding is trimmed; grouped
+   messages (pb-1) keep theirs. */
+[data-message-role="assistant"].pb-4 {
   padding-bottom: 0;
 }
 
-[data-message-role="user"] {
-  padding-top: 0;
-  padding-bottom: 1.75rem;
-}
-
-[data-message-role="user"] > div {
-  position: relative;
-}
-
-[data-message-role="user"] > div > div:nth-child(2) {
-  position: absolute;
-  top: 100%;
-  right: 0;
+[data-message-role="user"].pb-4 {
+  padding-bottom: 0.25rem;
 }
 
 [data-timeline-row-kind="turn-fold"] button {
