@@ -89,8 +89,9 @@ const unitTestProject = {
     exclude: ["src/**/*.browser.test.{ts,tsx}"],
     hookTimeout: 15_000,
     testTimeout: 15_000,
+    // Fork: no longTempDir setup. It only acts on Windows, and its node:sea
+    // import (via hostProcess) can't be bundled for jsdom tests.
     setupFiles: [
-      "../../packages/shared/src/testing/longTempDir.ts",
       "../../packages/shared/src/testing/providerEnv.ts",
       "../../packages/shared/src/testing/gitEnv.ts",
     ],
