@@ -1,4 +1,4 @@
-import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
 import { expect, it, vi } from "vite-plus/test";
 
 import { act, render } from "../../../test/render";
@@ -50,6 +50,7 @@ it("keeps the draft when stashing while a pasted image is still compressing", as
   const promptRef = { current: "Describe this screenshot" };
   const input = {
     environmentId,
+    activeProjectId: ProjectId.make("project-1"),
     composerDraftTarget: target,
     promptRef,
     readAttachmentDraft: () => ({ images: [], files: [] }),

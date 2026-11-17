@@ -6,6 +6,7 @@ import {
   type EnvironmentId,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   type PreviewAnnotationPayload,
+  type ProjectId,
   type ThreadContextRecord,
 } from "@t3tools/contracts";
 import {
@@ -25,6 +26,7 @@ import {
   MAX_STASH_ENTRIES,
   type PromptStashEntry,
   partitionStashAttachments,
+  selectProjectStashEntries,
   usePromptStashStore,
 } from "../../promptStashStore";
 import type { PendingUserInputProgress } from "../../pendingUserInput";
@@ -77,6 +79,7 @@ import { useStableCallback } from "../../hooks/useStableCallback";
  */
 export function useComposerStash(input: {
   readonly environmentId: EnvironmentId;
+  readonly activeProjectId: ProjectId | null;
   readonly composerDraftTarget: ChatComposerProps["composerDraftTarget"];
   readonly promptRef: ChatComposerProps["promptRef"];
   readonly readAttachmentDraft: () => Pick<ComposerThreadDraftState, "images" | "files">;
@@ -107,6 +110,7 @@ export function useComposerStash(input: {
 }) {
   const {
     environmentId,
+    activeProjectId,
     composerDraftTarget,
     promptRef,
     readAttachmentDraft,
@@ -157,7 +161,9 @@ export function useComposerStash(input: {
   const [stashPulseKey, setStashPulseKey] = useState(0);
   const stashInFlightRef = useRef<Set<string>>(new Set());
 
-  const stashQueue = usePromptStashStore((state) => state.entries);
+  // Fork: stashes are scoped to the current project.
+  const allStashEntries = usePromptStashStore((state) => state.entries);
+  const stashQueue = selectProjectStashEntries(allStashEntries, environmentId, activeProjectId);
   const stashEntryToQueue = usePromptStashStore((state) => state.stashEntry);
   const takeStashEntry = usePromptStashStore((state) => state.takeEntry);
   const finalizeStashEntryImages = usePromptStashStore((state) => state.finalizeEntryImages);
@@ -515,6 +521,8 @@ export function useComposerStash(input: {
       });
       return;
     }
+    // Fork: an entry saved without a project could never be listed again.
+    if (activeProjectId === null) return;
     const replyTo = getComposerDraft(composerDraftTarget)?.replyTo;
     const trimmedPrompt = promptRef.current.trim();
     // A trailing chip only parses with whitespace after it, so keep one space to restore it.
@@ -540,7 +548,11 @@ export function useComposerStash(input: {
       ),
     ];
     if (prompt.length === 0 && images.length === 0 && files.length === 0) {
-      const entries = usePromptStashStore.getState().entries;
+      const entries = selectProjectStashEntries(
+        usePromptStashStore.getState().entries,
+        environmentId,
+        activeProjectId,
+      );
       const entry = entries.length === 1 ? entries[0] : undefined;
       if (entry && !entry.pendingImageCount) {
         await restoreStashEntry(entry);
@@ -606,6 +618,8 @@ export function useComposerStash(input: {
       const { evicted, written, durable } = stashEntryToQueue({
         id: entryId,
         createdAt: new Date().toISOString(),
+        environmentId,
+        projectId: activeProjectId,
         prompt,
         attachments: [],
         ...(stashedFiles.length > 0 ? { files: stashedFiles } : {}),
