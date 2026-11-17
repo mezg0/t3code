@@ -197,8 +197,9 @@ Decisions the CSS records, so nobody re-litigates them:
 - **Shelf rows match** (Working, Snoozed, Settled): same height and inset, no age; Snoozed keeps its
   wake time.
 - **The conversation is an inset panel** (Linear-style): a rounded panel with a hairline edge and an
-  8px gap, the window and sidebar in the sidebar colour, the panel toggles and the built-in
-  browser's corner moved in to match. The corner is 8px, concentric with the macOS window corner
+  8px gap, the window and sidebar in the sidebar colour, the header's contents kept on the window
+  controls' line (level with the sidebar toggle), and the panel toggles and the built-in browser's
+  corner moved in to match. The corner is 8px, concentric with the macOS window corner
   across the gap. The right panel stays inside the panel: a flat right panel was shipped and
   reverted because the browser and other tabs looked wrong on the sidebar's surface.
 - **One consistency pass:** three text levels, one radius scale (16px composer and bubbles, 8px
