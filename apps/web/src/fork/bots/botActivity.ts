@@ -1,30 +1,126 @@
 import { parseThreadKey } from "@t3tools/client-runtime/state/entities";
 import type { EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
+import type { AnyRouter } from "@tanstack/react-router";
 import { Atom, type AtomRegistry } from "effect/reactivity";
+import { msg } from "gt-react";
 
+import { toastManager } from "../../components/ui/toast";
+import { getClientSettings } from "../../hooks/useSettings";
+import { m } from "../../i18n/messages";
 import { environmentThreadDetails } from "../../state/threads";
-import { type BotMessage, latestBotMessage } from "./botLogic";
-import { botThreadKey, findBot, readBots, subscribeBots } from "./botStore";
+import {
+  hasDesktopNotifications,
+  hasNotificationSound,
+  playNotificationSound,
+  threadNotificationTag,
+} from "../../threadNotifications";
+import { type BotMessage, botMessages, isRunStartedByUser, mergeBotLog } from "./botLogic";
+import {
+  type Bot,
+  botThreadKey,
+  findBot,
+  readBotLog,
+  readBots,
+  subscribeBots,
+  updateBotLog,
+} from "./botStore";
 
-/** The bot's latest `send_to_user` message, read from its thread detail. */
-export const botMessageAtom = Atom.family((key: string) => {
-  let previous: BotMessage | null = null;
+const threadAtom = (key: string) => environmentThreadDetails.quietThreadAtom(parseThreadKey(key));
+
+/** The bot's `send_to_user` messages in its loaded turns; null until the detail loads. */
+const botMessagesAtom = Atom.family((key: string) => {
+  let previous: ReadonlyArray<BotMessage> | null = null;
   return Atom.make((get) => {
-    const thread = get(environmentThreadDetails.quietThreadAtom(parseThreadKey(key)));
-    // Keep the last message while the detail reloads, so a reconnect is not a new message.
-    if (thread === null) return previous;
-    const next = latestBotMessage(thread.projection.turnItems);
-    if (next?.itemId !== previous?.itemId) previous = next;
+    const thread = get(threadAtom(key));
+    if (thread === null) return null;
+    const next = botMessages(thread.projection.turnItems);
+    const same =
+      previous !== null &&
+      previous.length === next.length &&
+      previous.at(-1)?.itemId === next.at(-1)?.itemId;
+    if (!same) previous = next;
     return previous;
-  }).pipe(Atom.withLabel(`fork-bot-message:${key}`));
+  }).pipe(Atom.withLabel(`fork-bot-messages:${key}`));
 });
 
+function presentBotMessage(router: AnyRouter, bot: Bot, message: BotMessage): void {
+  const params = (router.state.matches.at(-1)?.params ?? {}) as {
+    environmentId?: string;
+    threadId?: string;
+  };
+  const focused = document.visibilityState === "visible" && document.hasFocus();
+  if (focused && params.environmentId === bot.environmentId && params.threadId === bot.threadId) {
+    return;
+  }
+  const { notificationMode: mode, inAppNotificationsEnabled } = getClientSettings();
+  if (hasNotificationSound(mode)) {
+    void playNotificationSound("completion", () =>
+      hasNotificationSound(getClientSettings().notificationMode),
+    );
+  }
+  const open = () =>
+    void router.navigate({
+      to: "/$environmentId/$threadId",
+      params: { environmentId: bot.environmentId, threadId: bot.threadId },
+    });
+  if (focused) {
+    if (!inAppNotificationsEnabled) return;
+    const toastId = toastManager.add({
+      type: "info",
+      title: bot.name,
+      description: message.text,
+      data: { hideCopyButton: true },
+      actionProps: {
+        children: m(msg("Open thread")),
+        onClick: () => {
+          toastManager.close(toastId);
+          open();
+        },
+      },
+    });
+    return;
+  }
+  if (
+    !hasDesktopNotifications(mode) ||
+    typeof Notification === "undefined" ||
+    Notification.permission !== "granted"
+  ) {
+    return;
+  }
+  try {
+    const notification = new Notification(bot.name, {
+      body: message.text,
+      tag: threadNotificationTag(bot.environmentId, bot.threadId),
+      silent: true,
+    });
+    notification.addEventListener("click", () => {
+      notification.close();
+      window.focus();
+      void window.desktopBridge?.revealWindow().catch(() => undefined);
+      open();
+    });
+  } catch {
+    // Some browsers expose Notification but reject desktop presentation.
+  }
+}
+
 /**
- * Keeps every bot's thread detail loaded, so the shell's completion can be checked against the
- * messages the run sent. Shells carry no message text.
+ * Keeps every bot's thread detail loaded (shells carry no message text), logs the messages it
+ * sends, and alerts each new one once, even if it arrived while this client was away.
  */
-export function startBotWatch(registry: AtomRegistry.AtomRegistry): () => void {
+export function startBotWatch(registry: AtomRegistry.AtomRegistry, router: AnyRouter): () => void {
   const subscriptions = new Map<string, () => void>();
+  const observe = (key: string, seen: ReadonlyArray<BotMessage> | null) => {
+    const bot = readBots().find((candidate) => botThreadKey(candidate) === key);
+    if (bot === undefined || seen === null) return;
+    const log = readBotLog(key);
+    const { messages, added } = mergeBotLog(log.messages, seen);
+    const newest = added.at(-1);
+    if (newest === undefined) return;
+    const alert = newest.itemId !== log.alertedItemId;
+    updateBotLog(key, () => ({ alertedItemId: newest.itemId, messages }));
+    if (alert) presentBotMessage(router, bot, newest);
+  };
   const sync = () => {
     const keys = new Set(readBots().map(botThreadKey));
     for (const [key, unsubscribe] of subscriptions) {
@@ -33,12 +129,13 @@ export function startBotWatch(registry: AtomRegistry.AtomRegistry): () => void {
       subscriptions.delete(key);
     }
     for (const key of keys) {
-      if (!subscriptions.has(key)) {
-        subscriptions.set(
-          key,
-          registry.subscribe(botMessageAtom(key), () => undefined),
-        );
-      }
+      if (subscriptions.has(key)) continue;
+      subscriptions.set(
+        key,
+        registry.subscribe(botMessagesAtom(key), (seen) => observe(key, seen), {
+          immediate: true,
+        }),
+      );
     }
   };
   sync();
@@ -51,10 +148,10 @@ export function startBotWatch(registry: AtomRegistry.AtomRegistry): () => void {
 }
 
 /**
- * How a finished run in a bot thread alerts: null for an ordinary thread or alert, "quiet" when
- * the run sent nothing, or the bot's name and message.
+ * Whether a finished run in a bot thread uses the ordinary completion alert: only when the user
+ * started it by typing and it sent no message. Messages alert through startBotWatch.
  */
-export function resolveBotAlert(
+export function resolveBotCompletion(
   registry: AtomRegistry.AtomRegistry,
   input: {
     readonly environmentId: EnvironmentId;
@@ -62,13 +159,15 @@ export function resolveBotAlert(
     readonly latestRunId: RunId | null;
     readonly completion: boolean;
   },
-): "quiet" | { readonly title: string; readonly body: string } | null {
+): "quiet" | null {
   if (!input.completion) return null;
   const bot = findBot(readBots(), input.environmentId, input.threadId);
   if (bot === null) return null;
-  const message = registry.get(botMessageAtom(botThreadKey(bot)));
-  if (message === null || input.latestRunId === null || message.runId !== input.latestRunId) {
-    return "quiet";
-  }
-  return { title: bot.name, body: message.text };
+  const thread = registry.get(threadAtom(botThreadKey(bot)));
+  const runId = input.latestRunId;
+  if (thread === null || runId === null) return "quiet";
+  const items = thread.projection.turnItems;
+  // A run that sent a message already alerted with it.
+  const sentMessage = botMessages(items).some((message) => message.runId === runId);
+  return !sentMessage && isRunStartedByUser(items, runId, bot.setupMessageId) ? null : "quiet";
 }

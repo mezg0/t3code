@@ -42,7 +42,7 @@ import {
   type ThreadNotificationObservation,
 } from "./ThreadNotificationCoordinator.logic";
 import { toastManager } from "./ui/toast";
-import { resolveBotAlert } from "../fork/bots/botActivity";
+import { resolveBotCompletion } from "../fork/bots/botActivity";
 
 interface NotificationState extends ThreadNotificationObservation {
   readonly raw: OrchestrationV2ThreadShell;
@@ -143,14 +143,14 @@ export function startThreadNotifications(
         .has(threadKey({ environmentId, threadId: thread.id }))
     )
       return;
-    // Fork: a bot's finished run alerts only with the message it sent.
-    const botAlert = resolveBotAlert(registry, {
+    // Fork: a bot's wake-ups alert only through the messages they send; see startBotWatch.
+    const botCompletion = resolveBotCompletion(registry, {
       environmentId,
       threadId: thread.id,
       latestRunId: state.raw.latestRunId,
       completion: kind === "completion",
     });
-    if (botAlert === "quiet") return;
+    if (botCompletion === "quiet") return;
     const { notificationMode: mode, inAppNotificationsEnabled } = getClientSettings();
     const active = activeThread();
     const title =
@@ -180,8 +180,8 @@ export function startThreadNotifications(
       const toastId: ToastId = toastManager.add({
         onRemove: (): void => forgetToast(toastKey, toastId),
         type: kind === "completion" ? "success" : status === "failed" ? "error" : "warning",
-        title: botAlert?.title ?? title,
-        description: botAlert?.body ?? thread.title,
+        title,
+        description: thread.title,
         data: {
           hideCopyButton: true,
           leadingIcon:
@@ -219,8 +219,8 @@ export function startThreadNotifications(
     )
       return;
     try {
-      const notification = new Notification(botAlert?.title ?? title, {
-        body: botAlert?.body ?? thread.title,
+      const notification = new Notification(title, {
+        body: thread.title,
         tag: threadNotificationTag(environmentId, thread.id),
         silent: true,
         // Windows drops clicks after a toast moves into Notification Center.
