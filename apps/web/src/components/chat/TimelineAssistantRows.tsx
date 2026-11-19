@@ -24,6 +24,8 @@ import { readThreadTurnItems } from "../../state/entities";
 import { useV2ItemSupport } from "../../state/v2ItemSupport";
 import { TimelineRowCtx, TimelineRowActivityCtx, type TimelineRow } from "./timelineRowContext";
 import { MESSAGE_HEADING_LEVEL, MessageAuthorHeading } from "./TimelineRowParts";
+import { BotMessageHeader } from "../../fork/bots/BotMessageHeader";
+import { useBot, useBotShowWork } from "../../fork/bots/botStore";
 
 export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "message" }> }) {
   const ctx = use(TimelineRowCtx);
@@ -36,11 +38,16 @@ export function AssistantTimelineRow({ row }: { row: Extract<TimelineRow, { kind
   const text = liveText ?? row.message.text;
   const messageText =
     text || (row.message.streaming || row.suppressEmptyResponse ? "" : gt("(empty response)"));
+  // Fork: in a bot's chat view, its replies carry its photo and name.
+  const bot = useBot(ctx.threadRef?.environmentId, ctx.threadRef?.threadId);
+  const [showBotWork] = useBotShowWork();
+  const botHeader = bot !== null && !showBotWork ? bot : null;
 
   return (
     <>
       <div className="relative min-w-0 px-1 py-0.5">
-        <MessageAuthorHeading>T3 Code</MessageAuthorHeading>
+        <MessageAuthorHeading>{botHeader?.name ?? "T3 Code"}</MessageAuthorHeading>
+        {botHeader !== null ? <BotMessageHeader bot={botHeader} /> : null}
         <div data-thread-find-text="true">
           <AssistantCitationSource
             messageId={row.message.id}
@@ -95,10 +102,18 @@ export function SentMessageTimelineRow({
   row: Extract<TimelineRow, { kind: "sent-message" }>;
 }) {
   const ctx = use(TimelineRowCtx);
+  // Fork: a bot's messages carry its photo and name.
+  const bot = useBot(ctx.threadRef?.environmentId, ctx.threadRef?.threadId);
 
   return (
     <div className="min-w-0 px-1 py-0.5">
-      <MessageAuthorHeading>T3 Code</MessageAuthorHeading>
+      <MessageAuthorHeading>{bot?.name ?? "T3 Code"}</MessageAuthorHeading>
+      {bot !== null ? (
+        <BotMessageHeader
+          bot={bot}
+          time={{ createdAt: row.createdAt, format: ctx.timestampFormat }}
+        />
+      ) : null}
       {/* Sent messages have no message id; citations name their turn item instead. */}
       <AssistantCitationSource
         messageId={MessageId.make(row.id)}
