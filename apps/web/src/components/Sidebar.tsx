@@ -280,6 +280,8 @@ import {
   useDraftTerminalLabels,
   useSidebarDrafts,
 } from "./sidebar/SidebarDraftBlock";
+import { findBot, isBotProject, useBots } from "../fork/bots/botStore";
+import { SidebarBotsSection } from "../fork/bots/SidebarBotsSection";
 import {
   SidebarProjectFolderHeader,
   sidebarFolderRowId,
@@ -861,7 +863,13 @@ function useSidebarLookups() {
   const environments = useEnvironmentIdentities();
   const serverConfigs = useServerConfigs();
   const providerEntriesByEnvironment = useAtomValue(sidebarProviderEntriesAtom);
-  const projectGroups = useSidebarProjectGroups();
+  // Fork: a bot's home project stays out of the project lists.
+  const bots = useBots();
+  const projectGroups = useSidebarProjectGroups().filter(
+    (group) =>
+      group.memberProjectRefs.length === 0 ||
+      !group.memberProjectRefs.every((ref) => isBotProject(bots, ref.environmentId, ref.projectId)),
+  );
   const environmentLabelById = new Map(
     environments.map((environment) => [environment.environmentId, environment.label] as const),
   );
@@ -1158,7 +1166,13 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
             ),
           ),
         );
-  const threads = useQuietThreadShells();
+  // Fork: bot threads list only in the Bots section.
+  const bots = useBots();
+  const allThreads = useQuietThreadShells();
+  const threads =
+    bots.length === 0
+      ? allThreads
+      : allThreads.filter((thread) => findBot(bots, thread.environmentId, thread.id) === null);
   const promotingDraftThreadKeys = usePromotingDraftThreadKeys();
   const listedThreads =
     promotingDraftThreadKeys.length === 0
@@ -3515,6 +3529,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               )}
             </div>
           ) : null}
+          {/* Fork: bots sit above the thread list. */}
+          {!isSearchingThreads ? <SidebarBotsSection /> : null}
           {!isSearchingThreads ? (
             <TooltipProvider
               key="sidebar-thread-tooltips-150"
