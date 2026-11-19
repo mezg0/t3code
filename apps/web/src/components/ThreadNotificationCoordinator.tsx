@@ -42,6 +42,7 @@ import {
   type ThreadNotificationObservation,
 } from "./ThreadNotificationCoordinator.logic";
 import { toastManager } from "./ui/toast";
+import { resolveBotAlert } from "../fork/bots/botActivity";
 
 interface NotificationState extends ThreadNotificationObservation {
   readonly raw: OrchestrationV2ThreadShell;
@@ -142,6 +143,14 @@ export function startThreadNotifications(
         .has(threadKey({ environmentId, threadId: thread.id }))
     )
       return;
+    // Fork: a bot's finished run alerts only with the message it sent.
+    const botAlert = resolveBotAlert(registry, {
+      environmentId,
+      threadId: thread.id,
+      latestRunId: state.raw.latestRunId,
+      completion: kind === "completion",
+    });
+    if (botAlert === "quiet") return;
     const { notificationMode: mode, inAppNotificationsEnabled } = getClientSettings();
     const active = activeThread();
     const title =
@@ -171,8 +180,8 @@ export function startThreadNotifications(
       const toastId: ToastId = toastManager.add({
         onRemove: (): void => forgetToast(toastKey, toastId),
         type: kind === "completion" ? "success" : status === "failed" ? "error" : "warning",
-        title,
-        description: thread.title,
+        title: botAlert?.title ?? title,
+        description: botAlert?.body ?? thread.title,
         data: {
           hideCopyButton: true,
           leadingIcon:
@@ -210,8 +219,8 @@ export function startThreadNotifications(
     )
       return;
     try {
-      const notification = new Notification(title, {
-        body: thread.title,
+      const notification = new Notification(botAlert?.title ?? title, {
+        body: botAlert?.body ?? thread.title,
         tag: threadNotificationTag(environmentId, thread.id),
         silent: true,
         // Windows drops clicks after a toast moves into Notification Center.

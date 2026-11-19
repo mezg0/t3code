@@ -28,6 +28,9 @@ import { toastManager } from "../ui/toast";
 import { useThreadActionMenu } from "~/hooks/useThreadActionMenu";
 import { readLocalApi } from "~/localApi";
 import { threadEnvironment } from "../../state/threads";
+import { BotAvatar } from "../../fork/bots/BotAvatar";
+import { BotShowWorkToggle } from "../../fork/bots/BotShowWorkToggle";
+import { useBot } from "../../fork/bots/botStore";
 import { canShareWithGuestAtom } from "./guestShareAvailability";
 import { useAtomValue } from "@effect/atom-react";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
@@ -85,6 +88,8 @@ export const ChatHeader = memo(function ChatHeader({
   onFindInThread,
 }: ChatHeaderProps) {
   const gt = useGT();
+  // Fork: a bot thread shows the bot's photo instead of its home project.
+  const bot = useBot(activeThreadEnvironmentId, activeThreadId);
   const activeProjectName = activeProject?.isScratch ? gt("No project") : activeProject?.title;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const interfaceFont = useClientSettings((settings) => settings.fontFamilySans);
@@ -261,7 +266,11 @@ export const ChatHeader = memo(function ChatHeader({
         ariaLabel={gt("Thread breadcrumb")}
         className="flex-1 overflow-clip [overflow-clip-margin:2px]"
       >
-        {activeProject ? (
+        {bot !== null ? (
+          <WorkspaceBreadcrumbItem className="shrink-0">
+            <BotAvatar bot={bot} className="size-5 text-3xs" />
+          </WorkspaceBreadcrumbItem>
+        ) : activeProject ? (
           <>
             <WorkspaceBreadcrumbItem className="shrink">
               <Tooltip>
@@ -411,6 +420,7 @@ export const ChatHeader = memo(function ChatHeader({
           ) : null}
         </WorkspaceBreadcrumbItem>
       </WorkspaceBreadcrumb>
+      {bot !== null ? <BotShowWorkToggle /> : null}
       {isServerThread ? <GuestShareIndicator threadRef={activeThreadRef} /> : null}
     </div>
   );
