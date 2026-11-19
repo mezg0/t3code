@@ -319,8 +319,8 @@ export function startAppServices(): AppRouter {
   startHostFreezeToasts();
   startLegacyThreadMigrationToast();
   startPermissionUpdateNotices(router);
-  // Fork: bot threads stay loaded so their quiet runs can be told apart.
-  startBotWatch(appAtomRegistry);
+  // Fork: bot threads stay loaded so their messages alert and quiet runs do not.
+  startBotWatch(appAtomRegistry, router);
   startThreadNotifications(appAtomRegistry, router);
   startGuideRunNotifications(appAtomRegistry, router);
   if (isElectron) startDesktopUpdateLaunchNotice();

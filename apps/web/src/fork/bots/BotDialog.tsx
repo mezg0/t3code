@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { newMessageId, newProjectId, newThreadId } from "../../lib/utils";
+import { useProjects } from "../../state/entities";
 import { usePrimaryEnvironmentId } from "../../state/environments";
 import { projectEnvironment } from "../../state/projects";
 import { useEnvironmentQuery } from "../../state/query";
@@ -36,7 +37,7 @@ import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { avatarFromFile, BotAvatar } from "./BotAvatar";
 import { botSetupPrompt } from "./botSetupPrompt";
-import { type Bot, updateBots } from "./botStore";
+import { type Bot, botThreadKey, updateBotLog, updateBots } from "./botStore";
 
 const DEFAULT_MODEL_KEY = "claudeAgent:claude-opus-5-5";
 
@@ -50,6 +51,15 @@ function homeFolderName(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug === "" ? "bot" : slug;
+}
+
+/** `~/bots/<name>`, numbered when another project already uses that folder. */
+function uniqueHomeFolder(name: string, workspaceRoots: ReadonlyArray<string>): string {
+  const base = homeFolderName(name);
+  const taken = (folder: string) => workspaceRoots.some((root) => root.endsWith(`/bots/${folder}`));
+  let folder = base;
+  for (let suffix = 2; taken(folder); suffix += 1) folder = `${base}-${suffix}`;
+  return `~/bots/${folder}`;
 }
 
 /** Creates a bot, or edits one when `bot` is given. */
@@ -79,6 +89,7 @@ function BotDialogContent(props: { bot?: Bot; onClose: () => void }) {
   const editing = props.bot;
   const environmentId = usePrimaryEnvironmentId();
   const providers = useAtomValue(primaryServerProvidersAtom);
+  const projects = useProjects();
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
   const startTurn = useOrchestrationCommand(threadEnvironment.startTurn, { reportFailure: false });
   const updateThreadMetadata = useOrchestrationCommand(threadEnvironment.updateMetadata, {
@@ -155,7 +166,12 @@ function BotDialogContent(props: { bot?: Bot; onClose: () => void }) {
       input: {
         projectId,
         title: trimmedName,
-        workspaceRoot: `~/bots/${homeFolderName(trimmedName)}`,
+        workspaceRoot: uniqueHomeFolder(
+          trimmedName,
+          projects
+            .filter((project) => project.environmentId === environmentId)
+            .map((project) => project.workspaceRoot),
+        ),
         createWorkspaceRootIfMissing: true,
         defaultModelSelection: model.selection,
       },
@@ -324,6 +340,7 @@ function RemoveBotButton(props: { bot: Bot; disabled: boolean; onRemoved: () => 
           bot.environmentId !== props.bot.environmentId || bot.threadId !== props.bot.threadId,
       ),
     );
+    updateBotLog(botThreadKey(props.bot), () => null);
     props.onRemoved();
   };
   return (

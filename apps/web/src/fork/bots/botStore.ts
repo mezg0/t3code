@@ -11,6 +11,7 @@ import {
 
 // Bots live only in this client: the server sees an ordinary project and thread.
 const BOTS_KEY = "t3code:fork:bots:v1";
+const LOGS_KEY = "t3code:fork:bots:logs:v1";
 const SHOW_WORK_KEY = "t3code:fork:bots:show-work";
 
 const Bot = Schema.Struct({
@@ -26,40 +27,73 @@ const Bot = Schema.Struct({
 export type Bot = typeof Bot.Type;
 
 const Bots = Schema.Array(Bot);
-const EMPTY: ReadonlyArray<Bot> = [];
 
-let cached: { serialized: string | null; bots: ReadonlyArray<Bot> } = {
-  serialized: null,
-  bots: EMPTY,
-};
+const BotMessageSchema = Schema.Struct({
+  itemId: Schema.String,
+  runId: Schema.NullOr(Schema.String),
+  text: Schema.String,
+  at: Schema.String,
+});
 
-function readSerialized(): string | null {
-  try {
-    return window.localStorage.getItem(BOTS_KEY);
-  } catch {
-    return null;
-  }
+const BotLog = Schema.Struct({
+  /** The newest message already alerted, so a restart does not alert it again. */
+  alertedItemId: Schema.NullOr(Schema.String),
+  messages: Schema.Array(BotMessageSchema),
+});
+export type BotLog = typeof BotLog.Type;
+
+/** A localStorage value decoded once per write, so reads are stable for useSyncExternalStore. */
+function localStore<T, E>(key: string, schema: Schema.Codec<T, E>, empty: T) {
+  let cached: { serialized: string | null; value: T } = { serialized: null, value: empty };
+  const read = (): T => {
+    let serialized: string | null = null;
+    try {
+      serialized = window.localStorage.getItem(key);
+    } catch {
+      // Storage can be unavailable; fall back to the empty value.
+    }
+    if (serialized !== cached.serialized) {
+      cached = { serialized, value: readLocalStorageValue(key, empty, schema) };
+    }
+    return cached.value;
+  };
+  const subscribe = (onChange: () => void) => subscribeLocalStorageKey(key, onChange);
+  const update = (change: (value: T) => T) => writeLocalStorageValue(key, change, empty, schema);
+  return { read, subscribe, update };
 }
 
-/** Stable between writes, so it can back useSyncExternalStore. */
-export function readBots(): ReadonlyArray<Bot> {
-  const serialized = readSerialized();
-  if (serialized !== cached.serialized) {
-    cached = { serialized, bots: readLocalStorageValue(BOTS_KEY, EMPTY, Bots) };
-  }
-  return cached.bots;
-}
+const botsStore = localStore(BOTS_KEY, Bots, [] as ReadonlyArray<Bot>);
+const logsStore = localStore(
+  LOGS_KEY,
+  Schema.Record(Schema.String, BotLog),
+  {} as Readonly<Record<string, BotLog>>,
+);
 
-export function subscribeBots(onChange: () => void): () => void {
-  return subscribeLocalStorageKey(BOTS_KEY, onChange);
-}
+export const readBots = botsStore.read;
+export const subscribeBots = botsStore.subscribe;
+export const updateBots = botsStore.update;
 
 export function useBots(): ReadonlyArray<Bot> {
-  return useSyncExternalStore(subscribeBots, readBots, readBots);
+  return useSyncExternalStore(botsStore.subscribe, botsStore.read, botsStore.read);
 }
 
-export function updateBots(update: (bots: ReadonlyArray<Bot>) => ReadonlyArray<Bot>): void {
-  writeLocalStorageValue(BOTS_KEY, update, EMPTY, Bots);
+const EMPTY_LOG: BotLog = { alertedItemId: null, messages: [] };
+
+export function readBotLog(key: string): BotLog {
+  return logsStore.read()[key] ?? EMPTY_LOG;
+}
+
+export function useBotLog(key: string | null): BotLog {
+  const logs = useSyncExternalStore(logsStore.subscribe, logsStore.read, logsStore.read);
+  return (key === null ? undefined : logs[key]) ?? EMPTY_LOG;
+}
+
+export function updateBotLog(key: string, change: (log: BotLog) => BotLog | null): void {
+  logsStore.update((logs) => {
+    const { [key]: current, ...rest } = logs;
+    const next = change(current ?? EMPTY_LOG);
+    return next === null ? rest : { ...rest, [key]: next };
+  });
 }
 
 export function botThreadKey(bot: Pick<Bot, "environmentId" | "threadId">): string {

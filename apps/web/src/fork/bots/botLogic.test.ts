@@ -4,10 +4,18 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { TimelineEntry } from "../../session-logic";
 import type { ChatMessage } from "../../types";
-import { botTimelineEntries, latestBotMessage } from "./botLogic";
+import {
+  BOT_LOG_LIMIT,
+  type BotMessage,
+  botMessages,
+  botTimelineEntries,
+  isRunStartedByUser,
+  mergeBotLog,
+} from "./botLogic";
 
 const SETUP = MessageId.make("setup");
-const at = DateTime.makeUnsafe("2026-11-19T10:00:00Z");
+const T0 = "2026-11-19T10:00:00.000Z";
+const at = DateTime.makeUnsafe(T0);
 
 function message(
   id: string,
@@ -18,65 +26,103 @@ function message(
   return {
     id,
     kind: "message",
-    createdAt: "2026-11-19T10:00:00Z",
+    createdAt: T0,
     message: {
       id: MessageId.make(id),
       role,
       text: id,
       runId: runId === null ? null : RunId.make(runId),
       streaming: false,
-      createdAt: "2026-11-19T10:00:00Z",
-      updatedAt: "2026-11-19T10:00:00Z",
+      createdAt: T0,
+      updatedAt: T0,
       ...extra,
     },
   };
 }
 
-function sent(id: string, runId: string): TimelineEntry {
-  return {
-    id,
-    kind: "sent-message",
-    createdAt: "2026-11-19T10:00:00Z",
-    runId: RunId.make(runId),
-    text: id,
-  };
+function sent(id: string, runId: string, createdAt = T0): TimelineEntry {
+  return { id, kind: "sent-message", createdAt, runId: RunId.make(runId), text: id };
 }
 
-const work = (id: string) => ({ id, kind: "work" }) as unknown as TimelineEntry;
+const other = (id: string, kind: string, itemType = "command") =>
+  ({
+    id,
+    kind,
+    createdAt: T0,
+    projectedItem: { item: { type: itemType } },
+  }) as unknown as TimelineEntry;
+
+const logged = (itemId: string, iso: string): BotMessage => ({
+  itemId,
+  runId: "old",
+  text: itemId,
+  at: iso,
+});
 
 describe("botTimelineEntries", () => {
-  it("keeps what the user typed, sent messages and replies to the user's runs", () => {
+  it("keeps what the user typed, sent messages, replies to the user's runs and requests", () => {
     const entries = [
       message("setup", "user", "r0"),
       message("intro-narration", "assistant", "r0"),
       sent("intro", "r0"),
       message("wake", "user", "r1", { scheduledTaskId: ScheduledTaskId.make("task") }),
-      work("check-ci"),
+      other("check-ci", "work"),
+      other("fork-marker", "event", "fork"),
       message("quiet-reply", "assistant", "r1"),
       message("question", "user", "r2"),
       message("narration", "assistant", "r2"),
-      work("look"),
+      other("token", "event", "secret_request"),
       message("answer", "assistant", "r2"),
       message("wake-2", "user", "r3", { scheduledTaskId: ScheduledTaskId.make("task") }),
       sent("alert", "r3"),
       message("queued", "user", null),
     ];
-    expect(botTimelineEntries(entries, SETUP).map((entry) => entry.id)).toEqual([
+    expect(botTimelineEntries(entries, SETUP, []).map((entry) => entry.id)).toEqual([
       "intro",
       "question",
+      "token",
       "answer",
       "alert",
       "queued",
     ]);
   });
+
+  it("puts logged messages older than the loaded turns first", () => {
+    const entries = [
+      message("wake", "user", "r9", { scheduledTaskId: ScheduledTaskId.make("task") }),
+      sent("recent", "r9", "2026-11-19T12:00:00.000Z"),
+    ];
+    const log = [
+      logged("old", "2026-11-19T09:00:00.000Z"),
+      logged("recent", "2026-11-19T12:00:00.000Z"),
+    ];
+    expect(botTimelineEntries(entries, SETUP, log).map((entry) => entry.id)).toEqual([
+      "old",
+      "recent",
+    ]);
+  });
 });
 
-describe("latestBotMessage", () => {
+describe("mergeBotLog", () => {
+  it("adds unseen messages in time order and keeps the newest", () => {
+    const log = Array.from({ length: BOT_LOG_LIMIT }, (_, index) =>
+      logged(`m${index}`, `2026-11-19T09:${String(index).padStart(2, "0")}:00.000Z`),
+    );
+    const fresh = logged("new", "2026-11-19T11:00:00.000Z");
+    const merged = mergeBotLog(log, [log[BOT_LOG_LIMIT - 1]!, fresh]);
+    expect(merged.added).toEqual([fresh]);
+    expect(merged.messages).toHaveLength(BOT_LOG_LIMIT);
+    expect(merged.messages.at(-1)).toEqual(fresh);
+    expect(merged.messages[0]?.itemId).toBe("m1");
+  });
+});
+
+describe("botMessages", () => {
   const tool = (id: string, output: unknown, status = "completed") => ({
     id,
     type: "dynamic_tool",
     status,
-    runId: RunId.make("r1"),
+    runId: "r1",
     updatedAt: at,
     toolName: "mcp__t3-code__send_to_user",
     output,
@@ -85,18 +131,41 @@ describe("latestBotMessage", () => {
     { type: "text", text: JSON.stringify({ sentMessage, message: "Shown to the user." }) },
   ];
 
-  it("returns the newest completed send_to_user message", () => {
+  it("returns completed send_to_user messages, oldest first", () => {
     expect(
-      latestBotMessage([
+      botMessages([
         tool("old", payload("first")),
-        tool("new", payload("second")),
         tool("running", undefined, "in_progress"),
         { ...tool("other", payload("not a message")), toolName: "mcp__t3-code__t3_thread_list" },
+        tool("new", payload("second")),
       ]),
-    ).toEqual({ itemId: "new", runId: RunId.make("r1"), text: "second", at });
+    ).toEqual([
+      { itemId: "old", runId: "r1", text: "first", at: T0 },
+      { itemId: "new", runId: "r1", text: "second", at: T0 },
+    ]);
+  });
+});
+
+describe("isRunStartedByUser", () => {
+  const userItem = (runId: string, messageId: string, extra: object = {}) => ({
+    id: `item-${messageId}`,
+    type: "user_message",
+    status: "completed",
+    runId,
+    messageId: MessageId.make(messageId),
+    text: "hi",
+    createdBy: "user" as const,
+    ...extra,
   });
 
-  it("is null when the bot never messaged", () => {
-    expect(latestBotMessage([])).toBeNull();
+  it("is true only for runs the user started by typing", () => {
+    const items = [
+      userItem("r0", "setup"),
+      userItem("r1", "wake", { scheduledTaskId: ScheduledTaskId.make("task") }),
+      userItem("r2", "question"),
+    ];
+    expect(isRunStartedByUser(items, "r0", SETUP)).toBe(false);
+    expect(isRunStartedByUser(items, "r1", SETUP)).toBe(false);
+    expect(isRunStartedByUser(items, "r2", SETUP)).toBe(true);
   });
 });

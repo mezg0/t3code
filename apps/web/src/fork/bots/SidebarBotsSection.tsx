@@ -1,7 +1,5 @@
-import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import * as DateTime from "effect/DateTime";
 import { useGT } from "gt-react";
 import { PencilIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
@@ -10,10 +8,9 @@ import { resolveSidebarThreadStatus } from "../../components/Sidebar.logic";
 import { cn } from "../../lib/utils";
 import { useThreadShell } from "../../state/entities";
 import { buildThreadRouteParams, resolveThreadRouteTarget } from "../../threadRoutes";
-import { botMessageAtom } from "./botActivity";
 import { BotAvatar } from "./BotAvatar";
 import { BotDialog } from "./BotDialog";
-import { type Bot, botThreadKey, useBots } from "./botStore";
+import { type Bot, botThreadKey, useBotLog, useBots } from "./botStore";
 
 export function SidebarBotsSection() {
   const gt = useGT();
@@ -65,12 +62,12 @@ function BotRow(props: { bot: Bot; selected: boolean; onEdit: () => void }) {
   const { bot } = props;
   const threadRef = scopeThreadRef(bot.environmentId, bot.threadId);
   const shell = useThreadShell(threadRef);
-  const message = useAtomValue(botMessageAtom(botThreadKey(bot)));
+  const message = useBotLog(botThreadKey(bot)).messages.at(-1) ?? null;
   const status = shell === null ? null : resolveSidebarThreadStatus(shell);
   const lastVisitedAt = shell?.lastVisitedAt ?? null;
   const unread =
     message !== null &&
-    (lastVisitedAt === null || DateTime.toEpochMillis(message.at) > Date.parse(lastVisitedAt));
+    (lastVisitedAt === null || Date.parse(message.at) > Date.parse(lastVisitedAt));
   const subtitle =
     status === "approval" || status === "input" || status === "request"
       ? gt("Needs you")
