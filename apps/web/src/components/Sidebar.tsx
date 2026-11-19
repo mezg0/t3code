@@ -3374,6 +3374,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               </p>
             )
           ) : null}
+          {/* Fork: bots sit above the thread list. */}
+          {!isSearchingThreads ? <SidebarBotsSection /> : null}
           {/* A scope can hide every active thread; say so even when its project still has settled ones. */}
           {!isSearchingThreads &&
           !hasProjectFolders &&
@@ -3427,8 +3429,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               )}
             </div>
           ) : null}
-          {/* Fork: bots sit above the thread list. */}
-          {!isSearchingThreads ? <SidebarBotsSection /> : null}
           {!isSearchingThreads ? (
             <TooltipProvider
               key="sidebar-thread-tooltips-150"

@@ -1,13 +1,15 @@
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { useGT } from "gt-react";
+import { msg, useGT, useMessages } from "gt-react";
 import { PencilIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 
 import { resolveSidebarThreadStatus } from "../../components/Sidebar.logic";
+import { useNowMinute } from "../../hooks/useNowMinute";
 import { cn } from "../../lib/utils";
 import { useThreadShell } from "../../state/entities";
 import { buildThreadRouteParams, resolveThreadRouteTarget } from "../../threadRoutes";
+import { formatRelativeTime } from "../../timestampFormat";
 import { BotAvatar } from "./BotAvatar";
 import { BotDialog } from "./BotDialog";
 import { type Bot, botThreadKey, useBotLog, useBots } from "./botStore";
@@ -21,17 +23,17 @@ export function SidebarBotsSection() {
   const routeKey = target?.kind === "server" ? botThreadKey(target.threadRef) : null;
 
   return (
-    <div className="mb-2 flex flex-col gap-px">
-      <div className="flex items-end gap-2 px-2 pb-1 text-sidebar-muted-foreground text-xs leading-4 font-medium">
-        <span className="min-w-0 flex-1 truncate">
-          {gt("Bots", { $context: "sidebar section" })}
-        </span>
+    <div className="mb-1 flex flex-col gap-px">
+      {/* Matches the sidebar's section headers; the + sits where their chevron does. */}
+      <div className="mx-0.5 flex h-8 items-center gap-2 px-2 text-xs font-medium text-sidebar-muted-foreground">
+        <span className="min-w-0 truncate">{gt("Bots", { $context: "sidebar section" })}</span>
+        <span aria-hidden className="min-w-2 flex-1" />
         {bots.length > 0 ? <span className="font-normal tabular-nums">{bots.length}</span> : null}
         <button
           type="button"
           aria-label={gt("New bot")}
           onClick={() => setCreating(true)}
-          className="-mb-0.5 grid size-4 cursor-pointer place-items-center rounded-sm hover:text-sidebar-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          className="-me-1 grid size-5 shrink-0 cursor-pointer place-items-center rounded-sm hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           <PlusIcon aria-hidden className="size-3.5" />
         </button>
@@ -68,20 +70,24 @@ function BotRow(props: { bot: Bot; selected: boolean; onEdit: () => void }) {
   const unread =
     message !== null &&
     (lastVisitedAt === null || Date.parse(message.at) > Date.parse(lastVisitedAt));
-  const subtitle =
-    status === "approval" || status === "input" || status === "request"
-      ? gt("Needs you")
-      : status === "failed" || status === "limited"
-        ? gt("Something went wrong")
-        : status === "working" || status === "preparing"
-          ? gt("Working…")
-          : (message?.text ?? gt("Quiet"));
+  const needsYou = status === "approval" || status === "input" || status === "request";
+  const failed = status === "failed" || status === "limited";
+  const working = status === "working" || status === "preparing";
+  const subtitle = needsYou
+    ? gt("Needs you")
+    : failed
+      ? gt("Something went wrong")
+      : working
+        ? gt("Working…")
+        : (message?.text ?? gt("Quiet"));
 
   return (
     <div
       className={cn(
-        "group/bot relative flex h-9 items-center gap-2 rounded-md px-2 hover:bg-sidebar-row-hover",
-        props.selected && "bg-sidebar-row-selected",
+        "group/bot relative mx-0.5 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sidebar-foreground",
+        props.selected
+          ? "bg-sidebar-row-active light:ring-1 light:ring-inset light:ring-sidebar-border/70"
+          : "hover:bg-sidebar-row-hover",
       )}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -99,25 +105,55 @@ function BotRow(props: { bot: Bot; selected: boolean; onEdit: () => void }) {
           })
         }
       />
-      <BotAvatar bot={bot} className="pointer-events-none size-5 text-3xs" />
-      <div className="pointer-events-none min-w-0 flex-1 leading-tight">
-        <div className="truncate text-sm">{bot.name}</div>
-        <div className="truncate text-2xs text-sidebar-muted-foreground">{subtitle}</div>
+      <BotAvatar bot={bot} className="pointer-events-none size-8 text-sm" />
+      <div className="pointer-events-none flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex h-5 min-w-0 items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">{bot.name}</span>
+          {/* The edit button takes the time's place on hover, like a thread row's actions. */}
+          <span className="shrink-0 text-xs text-sidebar-muted-foreground tabular-nums group-focus-within/bot:hidden group-hover/bot:hidden">
+            {message !== null ? <BotMessageTime timestamp={message.at} /> : null}
+          </span>
+          <button
+            type="button"
+            aria-label={gt("Edit {name}", { name: bot.name })}
+            onClick={props.onEdit}
+            className="pointer-events-auto relative -me-1 hidden size-5 shrink-0 cursor-pointer place-items-center rounded-sm text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:grid focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring group-focus-within/bot:grid group-hover/bot:grid"
+          >
+            <PencilIcon aria-hidden className="size-3" />
+          </button>
+        </div>
+        <div className="flex h-4 min-w-0 items-center gap-2">
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate text-xs",
+              needsYou
+                ? "text-warning"
+                : failed
+                  ? "text-error"
+                  : unread
+                    ? "text-sidebar-foreground/90"
+                    : "text-sidebar-muted-foreground",
+            )}
+          >
+            {subtitle}
+          </span>
+          {unread ? (
+            <span
+              aria-label={gt("New message")}
+              className="size-2 shrink-0 rounded-full bg-primary"
+            />
+          ) : null}
+        </div>
       </div>
-      {unread ? (
-        <span
-          aria-label={gt("New message")}
-          className="size-1.5 shrink-0 rounded-full bg-primary"
-        />
-      ) : null}
-      <button
-        type="button"
-        aria-label={gt("Edit {name}", { name: bot.name })}
-        onClick={props.onEdit}
-        className="relative hidden size-5 cursor-pointer place-items-center rounded-sm text-sidebar-muted-foreground hover:text-sidebar-foreground focus-visible:grid group-hover/bot:grid"
-      >
-        <PencilIcon aria-hidden className="size-3" />
-      </button>
     </div>
   );
+}
+
+// Ticks once a minute on its own, so only the label re-renders.
+function BotMessageTime(props: { timestamp: string }) {
+  const nowMinute = useNowMinute();
+  const m = useMessages();
+  const parts = formatRelativeTime(props.timestamp, Date.parse(`${nowMinute}:00.000Z`), m);
+  if (parts === null) return null;
+  return parts.suffix === null ? m(msg("now", { $context: "relative time" })) : parts.value;
 }
