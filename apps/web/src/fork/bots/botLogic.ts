@@ -46,6 +46,16 @@ export function botMessages(turnItems: ReadonlyArray<TurnItemLike>): BotMessage[
   return messages;
 }
 
+/** A message's first line as plain text: the headline bots are asked to lead with. */
+export function botHeadline(text: string): string {
+  const line = text.split("\n").find((candidate) => candidate.trim() !== "") ?? "";
+  return line
+    .trim()
+    .replace(/^(?:#{1,6}\s+|>\s*|[-*+]\s+|\d+[.)]\s+)/, "")
+    .replace(/\*\*|__|`/g, "")
+    .trim();
+}
+
 /** After a bot's wake-up failure alerts, further failures stay quiet this long. */
 export const BOT_FAILURE_REALERT_MS = 24 * 60 * 60 * 1000;
 

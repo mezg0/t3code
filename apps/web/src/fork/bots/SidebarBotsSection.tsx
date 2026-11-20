@@ -13,6 +13,7 @@ import { formatRelativeTime } from "../../timestampFormat";
 import { BotAvatar } from "./BotAvatar";
 import { BotDialog } from "./BotDialog";
 import { useBotLatestMessage } from "./botActivity";
+import { botHeadline } from "./botLogic";
 import { type Bot, botThreadKey, useBots } from "./botStore";
 
 export function SidebarBotsSection() {
@@ -81,7 +82,9 @@ function BotRow(props: { bot: Bot; selected: boolean; onEdit: () => void }) {
       ? gt("Something went wrong")
       : working
         ? gt("Working…")
-        : (message?.text ?? gt("Quiet"));
+        : message !== null
+          ? botHeadline(message.text)
+          : gt("Quiet");
 
   return (
     <div
