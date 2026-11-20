@@ -1940,9 +1940,11 @@ const makeNativeOperations = Effect.fn("PreviewManager.makeOperations")(function
       return yield* new PreviewTabNotFoundError({ tabId });
     }
     // Restore the tab's zoom before publishing the guest so it never paints at inherited app zoom.
-    yield* attempt({ operation: "registerWebview.restoreZoomFactor", tabId, webContentsId }, () =>
-      wc.setZoomFactor(currentTab.zoomFactor),
-    );
+    // Fork: isolated, since Chromium otherwise shares zoom across every tab on the same host.
+    yield* attempt({ operation: "registerWebview.restoreZoomFactor", tabId, webContentsId }, () => {
+      wc.setZoomMode("isolated");
+      wc.setZoomFactor(currentTab.zoomFactor);
+    });
     // Replacement guests start unmuted; restore mute before publishing them.
     yield* attempt({ operation: "registerWebview.restoreAudioMuted", tabId, webContentsId }, () =>
       wc.setAudioMuted(currentTab.audioMuted),
