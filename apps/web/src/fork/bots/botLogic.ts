@@ -112,13 +112,15 @@ export function isRunStartedByUser(
 }
 
 /**
- * The bot's latest reply to a run the user started by typing. The sidebar shows it beside the
- * messages it sent, since a reply is how it answers when the user writes to it.
+ * The bot's final reply to the latest finished run the user started by typing; the sidebar shows
+ * it beside the messages it sent. Its time is the run's end, since thread structure drops the
+ * reply's own text and time (read the text with assistantMessageTextAtom).
  */
 export function latestBotReply(
   turnItems: ReadonlyArray<Parameters<typeof isRunStartedByUser>[0][number]>,
+  runs: ReadonlyArray<{ readonly id: string; readonly completedAt: DateTime.Utc | null }>,
   setupMessageId: MessageId,
-): BotMessage | null {
+): { readonly itemId: string; readonly runId: string; readonly at: string } | null {
   const userRuns = new Set<string>();
   for (const item of turnItems) {
     if (item.runId !== null && isRunStartedByUser([item], item.runId, setupMessageId)) {
@@ -130,14 +132,10 @@ export function latestBotReply(
     if (item === undefined || item.type !== "assistant_message" || item.status !== "completed") {
       continue;
     }
-    if (item.runId === null || !userRuns.has(item.runId) || item.updatedAt === undefined) continue;
-    if (!item.text) continue;
-    return {
-      itemId: item.id,
-      runId: item.runId,
-      text: item.text,
-      at: DateTime.formatIso(item.updatedAt),
-    };
+    if (item.runId === null || !userRuns.has(item.runId)) continue;
+    const completedAt = runs.find((run) => run.id === item.runId)?.completedAt;
+    if (completedAt == null) continue;
+    return { itemId: item.id, runId: item.runId, at: DateTime.formatIso(completedAt) };
   }
   return null;
 }

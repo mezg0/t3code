@@ -190,26 +190,24 @@ describe("latestBotReply", () => {
     type: "assistant_message",
     status,
     runId,
-    text: id,
-    updatedAt: at,
   });
+  const run = (id: string, done = true) => ({ id, completedAt: done ? at : null });
 
-  it("is the newest finished reply in a run the user started, never a wake-up's", () => {
+  it("is the final reply of the latest finished run the user started, never a wake-up's", () => {
     const wake = { scheduledTaskId: ScheduledTaskId.make("task") };
-    expect(
-      latestBotReply(
-        [
-          userItem("r1", "question"),
-          reply("progress", "r1"),
-          reply("answer", "r1"),
-          userItem("r2", "wake", wake),
-          reply("quiet", "r2"),
-          userItem("r3", "follow-up"),
-          reply("streaming", "r3", "inProgress"),
-        ],
-        SETUP,
-      ),
-    ).toEqual({ itemId: "answer", runId: "r1", text: "answer", at: T0 });
-    expect(latestBotReply([userItem("r0", "setup"), reply("intro", "r0")], SETUP)).toBeNull();
+    const items = [
+      userItem("r0", "setup"),
+      reply("intro", "r0"),
+      userItem("r1", "question"),
+      reply("progress", "r1"),
+      reply("answer", "r1"),
+      userItem("r2", "wake", wake),
+      reply("quiet", "r2"),
+      userItem("r3", "follow-up"),
+      reply("thinking aloud", "r3"),
+    ];
+    const runs = [run("r0"), run("r1"), run("r2"), run("r3", false)];
+    expect(latestBotReply(items, runs, SETUP)).toEqual({ itemId: "answer", runId: "r1", at: T0 });
+    expect(latestBotReply(items.slice(0, 2), runs, SETUP)).toBeNull();
   });
 });
