@@ -42,7 +42,7 @@ import {
   type ThreadNotificationObservation,
 } from "./ThreadNotificationCoordinator.logic";
 import { toastManager } from "./ui/toast";
-import { resolveBotCompletion } from "../fork/bots/botActivity";
+import { resolveBotAlert } from "../fork/bots/botActivity";
 
 interface NotificationState extends ThreadNotificationObservation {
   readonly raw: OrchestrationV2ThreadShell;
@@ -143,14 +143,19 @@ export function startThreadNotifications(
         .has(threadKey({ environmentId, threadId: thread.id }))
     )
       return;
-    // Fork: a bot's wake-ups alert only through the messages they send; see startBotWatch.
-    const botCompletion = resolveBotCompletion(registry, {
+    // Fork: a bot's wake-ups alert through the messages they send, and a failing one once a day.
+    const botAlert = resolveBotAlert(registry, {
       environmentId,
       threadId: thread.id,
       latestRunId: state.raw.latestRunId,
-      completion: kind === "completion",
+      outcome:
+        kind === "completion"
+          ? "completion"
+          : status === "failed" || status === "limited"
+            ? "failure"
+            : "other",
     });
-    if (botCompletion === "quiet") return;
+    if (botAlert === "quiet") return;
     const { notificationMode: mode, inAppNotificationsEnabled } = getClientSettings();
     const active = activeThread();
     const title =

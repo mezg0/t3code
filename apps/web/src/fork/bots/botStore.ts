@@ -39,6 +39,8 @@ const BotLog = Schema.Struct({
   /** The newest message already alerted, so a restart does not alert it again. */
   alertedItemId: Schema.NullOr(Schema.String),
   messages: Schema.Array(BotMessageSchema),
+  /** When a failing streak of wake-ups last alerted; cleared when a run completes. */
+  failureAlertedAt: Schema.optional(Schema.String),
 });
 export type BotLog = typeof BotLog.Type;
 

@@ -5,12 +5,14 @@ import { describe, expect, it } from "vite-plus/test";
 import type { TimelineEntry } from "../../session-logic";
 import type { ChatMessage } from "../../types";
 import {
+  BOT_FAILURE_REALERT_MS,
   BOT_LOG_LIMIT,
   type BotMessage,
   botMessages,
   botTimelineEntries,
   isRunStartedByUser,
   mergeBotLog,
+  shouldAlertBotFailure,
 } from "./botLogic";
 
 const SETUP = MessageId.make("setup");
@@ -114,6 +116,17 @@ describe("mergeBotLog", () => {
     expect(merged.messages).toHaveLength(BOT_LOG_LIMIT);
     expect(merged.messages.at(-1)).toEqual(fresh);
     expect(merged.messages[0]?.itemId).toBe("m1");
+  });
+});
+
+describe("shouldAlertBotFailure", () => {
+  it("alerts the first failure of a streak, then once a day", () => {
+    const alertedAt = "2026-11-19T09:00:00.000Z";
+    const at = Date.parse(alertedAt);
+    expect(shouldAlertBotFailure(undefined, at)).toBe(true);
+    expect(shouldAlertBotFailure(alertedAt, at + BOT_FAILURE_REALERT_MS - 1)).toBe(false);
+    expect(shouldAlertBotFailure(alertedAt, at + BOT_FAILURE_REALERT_MS)).toBe(true);
+    expect(shouldAlertBotFailure("garbage", at)).toBe(true);
   });
 });
 

@@ -46,6 +46,15 @@ export function botMessages(turnItems: ReadonlyArray<TurnItemLike>): BotMessage[
   return messages;
 }
 
+/** After a bot's wake-up failure alerts, further failures stay quiet this long. */
+export const BOT_FAILURE_REALERT_MS = 24 * 60 * 60 * 1000;
+
+/** Whether a failed wake-up alerts: the first since the last success, then at most once a day. */
+export function shouldAlertBotFailure(failureAlertedAt: string | undefined, now: number): boolean {
+  if (failureAlertedAt === undefined) return true;
+  return !(now - Date.parse(failureAlertedAt) < BOT_FAILURE_REALERT_MS);
+}
+
 /** Adds newly seen messages to the stored log, keeping the newest `BOT_LOG_LIMIT`. */
 export function mergeBotLog(
   log: ReadonlyArray<BotMessage>,

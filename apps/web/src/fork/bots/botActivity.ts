@@ -14,7 +14,13 @@ import {
   playNotificationSound,
   threadNotificationTag,
 } from "../../threadNotifications";
-import { type BotMessage, botMessages, isRunStartedByUser, mergeBotLog } from "./botLogic";
+import {
+  type BotMessage,
+  botMessages,
+  isRunStartedByUser,
+  mergeBotLog,
+  shouldAlertBotFailure,
+} from "./botLogic";
 import {
   type Bot,
   botThreadKey,
@@ -118,7 +124,7 @@ export function startBotWatch(registry: AtomRegistry.AtomRegistry, router: AnyRo
     const newest = added.at(-1);
     if (newest === undefined) return;
     const alert = newest.itemId !== log.alertedItemId;
-    updateBotLog(key, () => ({ alertedItemId: newest.itemId, messages }));
+    updateBotLog(key, (current) => ({ ...current, alertedItemId: newest.itemId, messages }));
     if (alert) presentBotMessage(router, bot, newest);
   };
   const sync = () => {
@@ -148,26 +154,40 @@ export function startBotWatch(registry: AtomRegistry.AtomRegistry, router: AnyRo
 }
 
 /**
- * Whether a finished run in a bot thread uses the ordinary completion alert: only when the user
- * started it by typing and it sent no message. Messages alert through startBotWatch.
+ * Whether a bot thread's alert is muted. A finished wake-up is quiet, since its messages alert
+ * through startBotWatch; a run the user started by typing that sent no message alerts as usual.
+ * A failed wake-up alerts once per failing streak, then at most daily, until a run completes.
  */
-export function resolveBotCompletion(
+export function resolveBotAlert(
   registry: AtomRegistry.AtomRegistry,
   input: {
     readonly environmentId: EnvironmentId;
     readonly threadId: ThreadId;
     readonly latestRunId: RunId | null;
-    readonly completion: boolean;
+    readonly outcome: "completion" | "failure" | "other";
   },
 ): "quiet" | null {
-  if (!input.completion) return null;
+  if (input.outcome === "other") return null;
   const bot = findBot(readBots(), input.environmentId, input.threadId);
   if (bot === null) return null;
-  const thread = registry.get(threadAtom(botThreadKey(bot)));
+  const key = botThreadKey(bot);
+  const items = registry.get(threadAtom(key))?.projection.turnItems ?? null;
   const runId = input.latestRunId;
-  if (thread === null || runId === null) return "quiet";
-  const items = thread.projection.turnItems;
+  const startedByUser =
+    items !== null && runId !== null && isRunStartedByUser(items, runId, bot.setupMessageId);
+  if (input.outcome === "failure") {
+    if (startedByUser) return null;
+    const now = Date.now();
+    if (!shouldAlertBotFailure(readBotLog(key).failureAlertedAt, now)) return "quiet";
+    const failureAlertedAt = new Date(now).toISOString();
+    updateBotLog(key, (current) => ({ ...current, failureAlertedAt }));
+    return null;
+  }
+  if (readBotLog(key).failureAlertedAt !== undefined) {
+    updateBotLog(key, ({ failureAlertedAt: _, ...current }) => current);
+  }
   // A run that sent a message already alerted with it.
-  const sentMessage = botMessages(items).some((message) => message.runId === runId);
-  return !sentMessage && isRunStartedByUser(items, runId, bot.setupMessageId) ? null : "quiet";
+  const sentMessage =
+    items !== null && botMessages(items).some((message) => message.runId === runId);
+  return !sentMessage && startedByUser ? null : "quiet";
 }
