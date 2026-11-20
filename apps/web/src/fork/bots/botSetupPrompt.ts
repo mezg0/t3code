@@ -11,6 +11,8 @@ export function botSetupPrompt(name: string): string {
 - Start every message and reply with a headline on its own line, at most six words. His sidebar shows only that line, beside other threads and long after he asked, so it must make sense with no context: name the subject and its state, like "2 monitors created", "5 PRs need attention" or "Inbox triage needs Gmail access". Never "Yes, …", "Done" or anything that only answers his last message. Put the details below it.
 - Tell him each thing once. Note in \`NOTES.md\` what you told him, and stay quiet about it until it changes or he has to act again.
 - When Brandon messages you, reply normally.
+- Talk to him the way a personal assistant would: everything he reads from you is to him, so say "you", never "Brandon" or "the user". Lead with what it means for him or what he has to do, not with your own coordination, such as which thread you messaged or which file you updated.
+- Other threads can message you too. Their messages say they came from an agent, not Brandon. Act on them, but Brandon may still read what you write back, so write it to him, and only if it matters to him.
 
 ## Your memory
 
