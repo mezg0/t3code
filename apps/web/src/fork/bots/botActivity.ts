@@ -58,10 +58,15 @@ const botReplyAtom = Atom.family((key: string) => {
   return Atom.make((get) => {
     const thread = get(threadAtom(key));
     const bot = readBots().find((candidate) => botThreadKey(candidate) === key);
-    const next =
+    const reply =
       thread === null || bot === undefined
         ? null
-        : latestBotReply(thread.projection.turnItems, bot.setupMessageId);
+        : latestBotReply(thread.projection.turnItems, thread.projection.runs, bot.setupMessageId);
+    const text =
+      reply === null
+        ? null
+        : get(environmentThreadDetails.assistantMessageTextAtom(parseThreadKey(key), reply.itemId));
+    const next = reply === null || !text ? null : { ...reply, text };
     if (next?.itemId !== previous?.itemId || next?.text !== previous?.text) previous = next;
     return previous;
   }).pipe(Atom.withLabel(`fork-bot-reply:${key}`));
