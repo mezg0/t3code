@@ -11,6 +11,7 @@ import {
   botMessages,
   botTimelineEntries,
   isRunStartedByUser,
+  latestBotReply,
   mergeBotLog,
   shouldAlertBotFailure,
 } from "./botLogic";
@@ -159,18 +160,18 @@ describe("botMessages", () => {
   });
 });
 
-describe("isRunStartedByUser", () => {
-  const userItem = (runId: string, messageId: string, extra: object = {}) => ({
-    id: `item-${messageId}`,
-    type: "user_message",
-    status: "completed",
-    runId,
-    messageId: MessageId.make(messageId),
-    text: "hi",
-    createdBy: "user" as const,
-    ...extra,
-  });
+const userItem = (runId: string, messageId: string, extra: object = {}) => ({
+  id: `item-${messageId}`,
+  type: "user_message",
+  status: "completed",
+  runId,
+  messageId: MessageId.make(messageId),
+  text: "hi",
+  createdBy: "user" as const,
+  ...extra,
+});
 
+describe("isRunStartedByUser", () => {
   it("is true only for runs the user started by typing", () => {
     const items = [
       userItem("r0", "setup"),
@@ -180,5 +181,35 @@ describe("isRunStartedByUser", () => {
     expect(isRunStartedByUser(items, "r0", SETUP)).toBe(false);
     expect(isRunStartedByUser(items, "r1", SETUP)).toBe(false);
     expect(isRunStartedByUser(items, "r2", SETUP)).toBe(true);
+  });
+});
+
+describe("latestBotReply", () => {
+  const reply = (id: string, runId: string, status = "completed") => ({
+    id,
+    type: "assistant_message",
+    status,
+    runId,
+    text: id,
+    updatedAt: at,
+  });
+
+  it("is the newest finished reply in a run the user started, never a wake-up's", () => {
+    const wake = { scheduledTaskId: ScheduledTaskId.make("task") };
+    expect(
+      latestBotReply(
+        [
+          userItem("r1", "question"),
+          reply("progress", "r1"),
+          reply("answer", "r1"),
+          userItem("r2", "wake", wake),
+          reply("quiet", "r2"),
+          userItem("r3", "follow-up"),
+          reply("streaming", "r3", "inProgress"),
+        ],
+        SETUP,
+      ),
+    ).toEqual({ itemId: "answer", runId: "r1", text: "answer", at: T0 });
+    expect(latestBotReply([userItem("r0", "setup"), reply("intro", "r0")], SETUP)).toBeNull();
   });
 });

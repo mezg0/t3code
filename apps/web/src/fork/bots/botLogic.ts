@@ -111,6 +111,37 @@ export function isRunStartedByUser(
   );
 }
 
+/**
+ * The bot's latest reply to a run the user started by typing. The sidebar shows it beside the
+ * messages it sent, since a reply is how it answers when the user writes to it.
+ */
+export function latestBotReply(
+  turnItems: ReadonlyArray<Parameters<typeof isRunStartedByUser>[0][number]>,
+  setupMessageId: MessageId,
+): BotMessage | null {
+  const userRuns = new Set<string>();
+  for (const item of turnItems) {
+    if (item.runId !== null && isRunStartedByUser([item], item.runId, setupMessageId)) {
+      userRuns.add(item.runId);
+    }
+  }
+  for (let index = turnItems.length - 1; index >= 0; index -= 1) {
+    const item = turnItems[index];
+    if (item === undefined || item.type !== "assistant_message" || item.status !== "completed") {
+      continue;
+    }
+    if (item.runId === null || !userRuns.has(item.runId) || item.updatedAt === undefined) continue;
+    if (!item.text) continue;
+    return {
+      itemId: item.id,
+      runId: item.runId,
+      text: item.text,
+      at: DateTime.formatIso(item.updatedAt),
+    };
+  }
+  return null;
+}
+
 const REQUEST_ITEM_TYPES = new Set(["secret_request", "link_request"]);
 
 /**
