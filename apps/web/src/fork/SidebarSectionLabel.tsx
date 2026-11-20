@@ -23,13 +23,13 @@ export function SidebarSectionLabel(props: {
     >
       <span className="min-w-0 flex-1 truncate">{props.label}</span>
       <span className="font-normal tabular-nums">{props.count}</span>
-      <ChevronDownIcon
-        aria-hidden
-        className={cn(
-          "mb-0.5 size-3 shrink-0 transition-transform",
-          !props.expanded && "-rotate-90",
-        )}
-      />
+      {/* Rotates inside a wrapper: a theme transform on the button's children would
+          otherwise be turned by the rotation and push the chevron sideways. */}
+      <span aria-hidden className="mb-0.5 shrink-0">
+        <ChevronDownIcon
+          className={cn("size-3 transition-transform", !props.expanded && "-rotate-90")}
+        />
+      </span>
     </button>
   );
 }
