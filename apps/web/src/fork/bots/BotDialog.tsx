@@ -1,12 +1,13 @@
-import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { canCreateProjectInEnvironment } from "@t3tools/client-runtime/operations/projects";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import type { ModelSelection } from "@t3tools/contracts";
+import { type ModelSelection, resolveEnvironmentMachineKind } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { useGT, useMessages } from "gt-react";
 import { type ChangeEvent, useRef, useState } from "react";
 
+import { EnvironmentMachineIcon } from "../../components/EnvironmentMachineIcon";
 import { Button } from "../../components/ui/button";
 import {
   Dialog,
@@ -27,17 +28,28 @@ import {
 } from "../../components/ui/select";
 import { newMessageId, newProjectId, newThreadId } from "../../lib/utils";
 import { useProjects } from "../../state/entities";
-import { usePrimaryEnvironmentId } from "../../state/environments";
+import {
+  useEnvironmentProviders,
+  useEnvironments,
+  usePrimaryEnvironmentId,
+} from "../../state/environments";
 import { projectEnvironment } from "../../state/projects";
 import { useEnvironmentQuery } from "../../state/query";
-import { primaryServerProvidersAtom, serverEnvironment } from "../../state/server";
+import { serverEnvironment } from "../../state/server";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { useOrchestrationCommand } from "../../state/use-orchestration-command";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { avatarFromFile, BotAvatar } from "./BotAvatar";
 import { botSetupPrompt } from "./botSetupPrompt";
-import { type Bot, botThreadKey, updateBotLog, updateBots } from "./botStore";
+import {
+  type Bot,
+  botThreadKey,
+  readLastBotServer,
+  rememberBotServer,
+  updateBotLog,
+  updateBots,
+} from "./botStore";
 
 const DEFAULT_MODEL_KEY = "claudeAgent:claude-opus-5-5";
 
@@ -87,8 +99,9 @@ function BotDialogContent(props: { bot?: Bot; onClose: () => void }) {
   const m = useMessages();
   const navigate = useNavigate();
   const editing = props.bot;
-  const environmentId = usePrimaryEnvironmentId();
-  const providers = useAtomValue(primaryServerProvidersAtom);
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
+  const { environments } = useEnvironments();
+  const providersByEnvironment = useEnvironmentProviders();
   const projects = useProjects();
   const createProject = useAtomCommand(projectEnvironment.create, { reportFailure: false });
   const startTurn = useOrchestrationCommand(threadEnvironment.startTurn, { reportFailure: false });
@@ -99,18 +112,37 @@ function BotDialogContent(props: { bot?: Bot; onClose: () => void }) {
   const [name, setName] = useState(editing?.name ?? "");
   const [avatar, setAvatar] = useState<string | null>(editing?.avatar ?? null);
   const [modelKey, setModelKey] = useState<string | null>(null);
+  const [serverId, setServerId] = useState<string | null>(readLastBotServer);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const models = providers
-    .filter((provider) => provider.enabled && provider.installed)
-    .flatMap((provider) =>
-      provider.models.map((model) => ({
-        key: `${provider.instanceId}:${model.slug}`,
-        selection: { instanceId: provider.instanceId, model: model.slug } as ModelSelection,
-        label: `${provider.displayName ?? provider.driver} · ${model.name}`,
-      })),
-    );
+  const servers = environments
+    .filter(
+      (environment) =>
+        canCreateProjectInEnvironment(environment.connection.phase) &&
+        environment.serverConfig !== null,
+    )
+    .map((environment) => ({
+      environmentId: environment.environmentId,
+      label: environment.label,
+      machine: resolveEnvironmentMachineKind(environment.serverConfig),
+    }))
+    .toSorted((a, b) => a.label.localeCompare(b.label));
+  const server =
+    servers.find((candidate) => candidate.environmentId === serverId) ??
+    servers.find((candidate) => candidate.environmentId === primaryEnvironmentId) ??
+    servers[0];
+  const environmentId = server?.environmentId ?? null;
+  const models =
+    (environmentId === null ? undefined : providersByEnvironment.get(environmentId))
+      ?.filter((provider) => provider.enabled && provider.installed)
+      .flatMap((provider) =>
+        provider.models.map((model) => ({
+          key: `${provider.instanceId}:${model.slug}`,
+          selection: { instanceId: provider.instanceId, model: model.slug } as ModelSelection,
+          label: `${provider.displayName ?? provider.driver} · ${model.name}`,
+        })),
+      ) ?? [];
   const model =
     models.find((candidate) => candidate.key === modelKey) ??
     models.find((candidate) => candidate.key === DEFAULT_MODEL_KEY) ??
@@ -215,6 +247,7 @@ function BotDialogContent(props: { bot?: Bot; onClose: () => void }) {
       fail(squashAtomCommandFailure(started), gt("Couldn't start the bot."));
       return;
     }
+    rememberBotServer(environmentId);
     updateBots((bots) => [
       ...bots,
       { environmentId, projectId, threadId, setupMessageId, name: trimmedName, avatar },
@@ -266,6 +299,34 @@ function BotDialogContent(props: { bot?: Bot; onClose: () => void }) {
             onChange={(event) => setName(event.target.value)}
           />
         </label>
+        {editing === undefined ? (
+          <label className="grid gap-1.5">
+            <span className="font-medium text-foreground text-xs">{gt("Server")}</span>
+            <Select
+              value={environmentId ?? ""}
+              onValueChange={(value) => {
+                if (value !== null) setServerId(value);
+              }}
+            >
+              <SelectTrigger aria-label={gt("Server")}>
+                {server ? (
+                  <EnvironmentMachineIcon kind={server.machine} className="size-3.5" />
+                ) : null}
+                <SelectValue>{server?.label ?? gt("No server connected")}</SelectValue>
+              </SelectTrigger>
+              <SelectPopup>
+                {servers.map((candidate) => (
+                  <SelectItem key={candidate.environmentId} value={candidate.environmentId}>
+                    <span className="inline-flex items-center gap-1.5">
+                      <EnvironmentMachineIcon kind={candidate.machine} className="size-3" />
+                      {candidate.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          </label>
+        ) : null}
         {editing === undefined ? (
           <label className="grid gap-1.5">
             <span className="font-medium text-foreground text-xs">{gt("Model")}</span>
