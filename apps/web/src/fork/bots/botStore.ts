@@ -13,6 +13,7 @@ import {
 const BOTS_KEY = "t3code:fork:bots:v1";
 const LOGS_KEY = "t3code:fork:bots:logs:v1";
 const SHOW_WORK_KEY = "t3code:fork:bots:show-work";
+const SERVER_KEY = "t3code:fork:bots:server";
 
 const Bot = Schema.Struct({
   environmentId: EnvironmentId,
@@ -140,4 +141,13 @@ export function useBotShowWork(): [boolean, (value: boolean) => void] {
     readShowWork,
   );
   return [showWork, (value) => writeLocalStorageValue(SHOW_WORK_KEY, value, false, Schema.Boolean)];
+}
+
+/** The server the last bot was created on, so the next one defaults to it. */
+export function readLastBotServer(): string | null {
+  return readLocalStorageValue(SERVER_KEY, null, Schema.NullOr(Schema.String));
+}
+
+export function rememberBotServer(environmentId: string): void {
+  writeLocalStorageValue(SERVER_KEY, environmentId, null, Schema.NullOr(Schema.String));
 }

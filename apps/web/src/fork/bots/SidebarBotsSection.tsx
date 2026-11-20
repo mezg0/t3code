@@ -24,8 +24,9 @@ export function SidebarBotsSection() {
 
   return (
     <div className="mb-1 flex flex-col gap-px">
-      {/* Matches the sidebar's section headers; the + sits where their chevron does. */}
-      <div className="mx-0.5 flex h-8 items-center gap-2 px-2 text-xs font-medium text-sidebar-muted-foreground">
+      {/* Matches the sidebar's section headers; the + sits where their chevron does. Their
+          class lets themes that restyle section labels restyle this one too. */}
+      <div className="sidebar-drag-boundary-label mx-0.5 flex h-8 items-center gap-2 px-2 text-xs font-medium text-sidebar-muted-foreground animate-none!">
         <span className="min-w-0 truncate">{gt("Bots", { $context: "sidebar section" })}</span>
         <span aria-hidden className="min-w-2 flex-1" />
         {bots.length > 0 ? <span className="font-normal tabular-nums">{bots.length}</span> : null}
