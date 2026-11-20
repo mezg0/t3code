@@ -8,6 +8,7 @@ import {
   BOT_FAILURE_REALERT_MS,
   BOT_LOG_LIMIT,
   type BotMessage,
+  botHeadline,
   botMessages,
   botTimelineEntries,
   isRunStartedByUser,
@@ -209,5 +210,16 @@ describe("latestBotReply", () => {
     const runs = [run("r0"), run("r1"), run("r2"), run("r3", false)];
     expect(latestBotReply(items, runs, SETUP)).toEqual({ itemId: "answer", runId: "r1", at: T0 });
     expect(latestBotReply(items.slice(0, 2), runs, SETUP)).toBeNull();
+  });
+});
+
+describe("botHeadline", () => {
+  it("is the first non-empty line without markdown markers", () => {
+    expect(botHeadline("\n**5 PRs need attention**\n\n- #2117 failing")).toBe(
+      "5 PRs need attention",
+    );
+    expect(botHeadline("## 2 monitors created\nDetails")).toBe("2 monitors created");
+    expect(botHeadline("- `prod-sql` is down")).toBe("prod-sql is down");
+    expect(botHeadline("Got it, UK time.")).toBe("Got it, UK time.");
   });
 });
