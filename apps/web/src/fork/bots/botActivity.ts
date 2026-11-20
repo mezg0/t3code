@@ -1,6 +1,7 @@
 import { parseThreadKey } from "@t3tools/client-runtime/state/entities";
 import type { EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
 import type { AnyRouter } from "@tanstack/react-router";
+import { useAtomValue } from "@effect/atom-react";
 import { Atom, type AtomRegistry } from "effect/reactivity";
 import { msg } from "gt-react";
 
@@ -18,6 +19,7 @@ import {
   type BotMessage,
   botMessages,
   isRunStartedByUser,
+  latestBotReply,
   mergeBotLog,
   shouldAlertBotFailure,
 } from "./botLogic";
@@ -29,6 +31,7 @@ import {
   readBots,
   subscribeBots,
   updateBotLog,
+  useBotLog,
 } from "./botStore";
 
 const threadAtom = (key: string) => environmentThreadDetails.quietThreadAtom(parseThreadKey(key));
@@ -48,6 +51,30 @@ const botMessagesAtom = Atom.family((key: string) => {
     return previous;
   }).pipe(Atom.withLabel(`fork-bot-messages:${key}`));
 });
+
+/** The bot's latest reply to the user; null until the detail loads or when it has none. */
+const botReplyAtom = Atom.family((key: string) => {
+  let previous: BotMessage | null = null;
+  return Atom.make((get) => {
+    const thread = get(threadAtom(key));
+    const bot = readBots().find((candidate) => botThreadKey(candidate) === key);
+    const next =
+      thread === null || bot === undefined
+        ? null
+        : latestBotReply(thread.projection.turnItems, bot.setupMessageId);
+    if (next?.itemId !== previous?.itemId || next?.text !== previous?.text) previous = next;
+    return previous;
+  }).pipe(Atom.withLabel(`fork-bot-reply:${key}`));
+});
+
+/** What the bot said last: a message it sent or its reply to the user, whichever is newer. */
+export function useBotLatestMessage(key: string): BotMessage | null {
+  const sent = useBotLog(key).messages.at(-1) ?? null;
+  const reply = useAtomValue(botReplyAtom(key));
+  if (sent === null) return reply;
+  if (reply === null) return sent;
+  return reply.at > sent.at ? reply : sent;
+}
 
 function presentBotMessage(router: AnyRouter, bot: Bot, message: BotMessage): void {
   const params = (router.state.matches.at(-1)?.params ?? {}) as {

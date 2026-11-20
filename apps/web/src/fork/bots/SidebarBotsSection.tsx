@@ -12,7 +12,8 @@ import { buildThreadRouteParams, resolveThreadRouteTarget } from "../../threadRo
 import { formatRelativeTime } from "../../timestampFormat";
 import { BotAvatar } from "./BotAvatar";
 import { BotDialog } from "./BotDialog";
-import { type Bot, botThreadKey, useBotLog, useBots } from "./botStore";
+import { useBotLatestMessage } from "./botActivity";
+import { type Bot, botThreadKey, useBots } from "./botStore";
 
 export function SidebarBotsSection() {
   const gt = useGT();
@@ -65,7 +66,7 @@ function BotRow(props: { bot: Bot; selected: boolean; onEdit: () => void }) {
   const { bot } = props;
   const threadRef = scopeThreadRef(bot.environmentId, bot.threadId);
   const shell = useThreadShell(threadRef);
-  const message = useBotLog(botThreadKey(bot)).messages.at(-1) ?? null;
+  const message = useBotLatestMessage(botThreadKey(bot));
   const status = shell === null ? null : resolveSidebarThreadStatus(shell);
   const lastVisitedAt = shell?.lastVisitedAt ?? null;
   const unread =
