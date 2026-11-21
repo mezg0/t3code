@@ -10,8 +10,6 @@ import {
   timelineHasEphemeralPreviewUrls,
 } from "../ChatView.logic";
 import { MessagesTimeline } from "./MessagesTimeline";
-import { botTimelineEntries } from "../../fork/bots/botLogic";
-import { botThreadKey, useBot, useBotLog, useBotShowWork } from "../../fork/bots/botStore";
 
 /**
  * The timeline with the streamed text. ChatView reads the thread through its quiet
@@ -42,15 +40,7 @@ export function ThreadTimeline({
     ...entriesInput,
     visibleTurnItems,
   });
-  // Fork: a bot thread reads as a chat unless "Show work" is on.
-  const bot = useBot(threadDetailRef?.environmentId, threadDetailRef?.threadId);
-  const [showBotWork] = useBotShowWork();
-  const botLog = useBotLog(bot === null ? null : botThreadKey(bot));
-  const entries =
-    draftEntries ??
-    (bot !== null && !showBotWork
-      ? botTimelineEntries(serverEntries, bot.setupMessageId, botLog.messages)
-      : serverEntries);
+  const entries = draftEntries ?? serverEntries;
   const displayedEntries = resolveThreadSwitchTimeline({
     loading: entries.length === 0 && syncing,
     activeThreadKey,
